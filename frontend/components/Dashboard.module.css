@@ -1,0 +1,136 @@
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  flex: 1;
+}
+
+/* ── Status bar ──────────────────────────────────────── */
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.statusLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.statusOk,
+.statusError {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.statusOk {
+  color: var(--green);
+}
+
+.statusError {
+  color: var(--red);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.statusMeta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.refreshBtn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem 0.6rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.4;
+}
+
+.refreshBtn:hover {
+  color: var(--text);
+  border-color: #3a3d52;
+}
+
+/* ── Error banner ────────────────────────────────────── */
+.errorBanner {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--red);
+  margin-bottom: 1.5rem;
+}
+
+/* ── Cards grid ──────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
+
+/* ── Loading / empty ─────────────────────────────────── */
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 300px;
+}
+
+.loadingText {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 600px) {
+  .section {
+    padding: 1rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
