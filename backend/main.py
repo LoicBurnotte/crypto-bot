@@ -39,24 +39,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Crypto Trading Bot", version="1.0.0", lifespan=lifespan)
 
-# Origins allowed to call the API.
-# In production set ALLOWED_ORIGINS=https://your-app.vercel.app on Railway.
-# The local dev origins are always included so the frontend works out of the box.
-_env_origins = os.getenv("ALLOWED_ORIGINS", "")
-_extra = [o.strip() for o in _env_origins.split(",") if o.strip()]
-allowed_origins = list(
-    {
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        *_extra,
-    }
-)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
