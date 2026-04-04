@@ -1,0 +1,16 @@
+.btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.75rem;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  color: var(--text);
+  border-color: #3a3d52;
+}

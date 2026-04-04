@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import type { AssetStatus } from "@/lib/api";
 import TradeModal from "./TradeModal";
 import styles from "./CryptoCard.module.css";
+
+const PriceChart = lazy(() => import("./PriceChart"));
 
 const SYMBOL_META: Record<string, { icon: string; color: string }> = {
   "BTC/EUR":   { icon: "₿",  color: "#f59e0b" },
@@ -64,8 +66,9 @@ export default function CryptoCard({
   asset: AssetStatus;
   flash: "up" | "down" | null;
 }) {
-  const [modal, setModal]     = useState<"buy" | "sell" | null>(null);
-  const [toast, setToast]     = useState<{ msg: string; error: boolean } | null>(null);
+  const [modal,     setModal]     = useState<"buy" | "sell" | null>(null);
+  const [toast,     setToast]     = useState<{ msg: string; error: boolean } | null>(null);
+  const [showChart, setShowChart] = useState(false);
 
   const meta     = SYMBOL_META[asset.symbol] ?? { icon: "○", color: "var(--blue)" };
   const [base]   = asset.symbol.split("/");
@@ -153,6 +156,19 @@ export default function CryptoCard({
           </div>
         )}
 
+        {/* Unrealised P&L */}
+        {asset.unrealised_pnl_pct !== null && asset.last_action === "BUY" && (
+          <div className={styles.dropRow}>
+            <span className={styles.label}>Unrealised P&amp;L</span>
+            <span style={{
+              color: (asset.unrealised_pnl_pct ?? 0) >= 0 ? "var(--green)" : "var(--red)",
+              fontWeight: 600, fontSize: "0.875rem",
+            }}>
+              {asset.unrealised_pnl_pct >= 0 ? "+" : ""}{asset.unrealised_pnl_pct.toFixed(2)}%
+            </span>
+          </div>
+        )}
+
         {/* CTA buttons */}
         <div className={styles.ctaRow}>
           <button
@@ -170,6 +186,17 @@ export default function CryptoCard({
             Sell {base}
           </button>
         </div>
+
+        {/* Chart toggle */}
+        <button className={styles.chartToggle} onClick={() => setShowChart(s => !s)}>
+          {showChart ? "▲ Hide chart" : "▼ Show chart"}
+        </button>
+
+        {showChart && (
+          <Suspense fallback={<div className={styles.chartLoading}>Loading chart…</div>}>
+            <PriceChart symbol={asset.symbol} />
+          </Suspense>
+        )}
 
         {/* Dry-run indicator */}
         {asset.dry_run && (

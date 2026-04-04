@@ -1,4 +1,5 @@
-import Dashboard from "@/components/Dashboard";
+import Dashboard   from "@/components/Dashboard";
+import LogoutButton from "@/components/LogoutButton";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
             <span className={styles.logoText}>CryptoBot</span>
           </div>
           <p className={styles.headerSub}>Live trading dashboard</p>
+          <LogoutButton />
         </div>
       </header>
       <Dashboard />

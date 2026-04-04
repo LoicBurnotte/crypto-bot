@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchStatus, type AssetStatus } from "@/lib/api";
-import BotControls from "./BotControls";
-import CryptoCard   from "./CryptoCard";
+import BotControls   from "./BotControls";
+import CryptoCard    from "./CryptoCard";
+import TradeHistory  from "./TradeHistory";
 import styles from "./Dashboard.module.css";
 
 const POLL_INTERVAL = 3_000; // ms — matches bot tick (10 s) with buffer
@@ -109,6 +110,9 @@ export default function Dashboard() {
           <strong>API unreachable:</strong> {error}
         </div>
       )}
+
+      {/* Trade history (collapsible) */}
+      <TradeHistory />
 
       {/* Cards grid */}
       {assets.length > 0 ? (

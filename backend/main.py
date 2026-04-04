@@ -5,12 +5,17 @@ from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from bot import TradingBot, SYMBOLS
+from bot import (
+    TradingBot, SYMBOLS,
+    TRAILING_STOP_PCT, TAKE_PROFIT_PCT,
+    RSI_PERIOD, RSI_OVERSOLD, RSI_OVERBOUGHT,
+    EMA_FAST, EMA_SLOW, TRADE_AMOUNT_EUR, MAX_DAILY_LOSS_EUR,
+)
 
 load_dotenv()
 
@@ -28,7 +33,7 @@ bot_task: asyncio.Task | None = None
 async def lifespan(app: FastAPI):
     global bot_task
     bot_task = asyncio.create_task(bot.run_loop(interval=10))
-    logger.info("Bot background loop started")
+    logger.info("Bot loop started")
     yield
     bot.stop()
     if bot_task:
@@ -37,14 +42,11 @@ async def lifespan(app: FastAPI):
             await bot_task
         except asyncio.CancelledError:
             pass
-    logger.info("Bot stopped")
 
 
-app = FastAPI(title="Crypto Trading Bot", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Crypto Trading Bot", version="2.0.0", lifespan=lifespan)
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
-# Belt-and-suspenders: CORSMiddleware handles preflight, raw middleware
-# stamps every response so Railway's CDN / Envoy never strips the header.
+# ── CORS: belt-and-suspenders ─────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,7 +57,6 @@ app.add_middleware(
 
 @app.middleware("http")
 async def force_cors(request: Request, call_next):
-    """Guarantee Access-Control-Allow-Origin on every response."""
     if request.method == "OPTIONS":
         res = Response(status_code=204)
         res.headers["Access-Control-Allow-Origin"]  = "*"
@@ -67,6 +68,14 @@ async def force_cors(request: Request, call_next):
     return response
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def live(data) -> JSONResponse:
+    res = JSONResponse(data)
+    res.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return res
+
+
 # ── Models ────────────────────────────────────────────────────────────────────
 
 class TradeRequest(BaseModel):
@@ -76,26 +85,16 @@ class TradeRequest(BaseModel):
     amount_crypto: Optional[float]        = Field(None, gt=0)
 
 class WithdrawRequest(BaseModel):
-    currency:     str   = Field("EUR", description="Currency to withdraw")
-    amount:       float = Field(..., gt=0)
-    key:          str   = Field(..., description="Kraken withdrawal key name (pre-configured in Kraken)")
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _no_cache(response: JSONResponse) -> JSONResponse:
-    """Prevent Railway CDN from caching live data endpoints."""
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"]        = "no-cache"
-    return response
+    currency: str   = "EUR"
+    amount:   float = Field(..., gt=0)
+    key:      str   = Field(..., description="Kraken withdrawal key name")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "Crypto Trading Bot API"}
-
+    return {"status": "ok"}
 
 @app.get("/health")
 def health():
@@ -104,42 +103,78 @@ def health():
 
 @app.get("/status")
 def get_status():
-    return _no_cache(JSONResponse({"assets": bot.get_status()}))
+    return live({"assets": bot.get_status()})
+
+
+@app.get("/config")
+def get_config():
+    return {
+        "symbols":           SYMBOLS,
+        "trailing_stop_pct": TRAILING_STOP_PCT,
+        "take_profit_pct":   TAKE_PROFIT_PCT,
+        "rsi_period":        RSI_PERIOD,
+        "rsi_oversold":      RSI_OVERSOLD,
+        "rsi_overbought":    RSI_OVERBOUGHT,
+        "ema_fast":          EMA_FAST,
+        "ema_slow":          EMA_SLOW,
+        "trade_amount_eur":  TRADE_AMOUNT_EUR,
+        "max_daily_loss_eur": MAX_DAILY_LOSS_EUR,
+        "dry_run":           TRADE_AMOUNT_EUR <= 0,
+    }
 
 
 @app.get("/portfolio")
 def get_portfolio():
-    """
-    Returns free/used/total balances for all non-zero assets.
-    Requires KRAKEN_API_KEY with Query Funds permission.
-    """
     try:
         raw = bot.exchange.fetch_balance()
         balances = {
-            currency: {
-                "free":  info["free"],
-                "used":  info["used"],
-                "total": info["total"],
-            }
-            for currency, info in raw.items()
-            if isinstance(info, dict)
-            and currency not in {"info", "free", "used", "total", "timestamp", "datetime"}
-            and (info.get("total") or 0) > 0
+            k: {"free": v["free"], "used": v["used"], "total": v["total"]}
+            for k, v in raw.items()
+            if isinstance(v, dict)
+            and k not in {"info", "free", "used", "total", "timestamp", "datetime"}
+            and (v.get("total") or 0) > 0
         }
-        return _no_cache(JSONResponse({"balances": balances}))
+        return live({"balances": balances, "daily_pnl": round(bot._daily_pnl, 2),
+                     "paused_loss": bot._paused_loss})
     except Exception as e:
-        logger.error("Portfolio fetch failed: %s", e)
         raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.get("/trades")
+def get_trades(limit: int = Query(50, le=500)):
+    trades = bot.trade_log.all()[:limit]
+    return live({"trades": trades, "total": len(bot.trade_log.all())})
+
+
+# Allowed OHLCV timeframes and their default candle limits
+_TIMEFRAME_LIMITS = {
+    "1h":  ("1h",  24),   # 1 day
+    "4h":  ("4h",  42),   # 1 week
+    "1d":  ("1d",  30),   # 1 month
+    "1w":  ("1w",  52),   # 1 year
+}
+
+@app.get("/ohlcv")
+def get_ohlcv(
+    symbol:    str = Query(..., example="BTC/EUR"),
+    timeframe: str = Query("1h", pattern="^(1h|4h|1d|1w)$"),
+    limit:     int = Query(0),
+):
+    if symbol not in SYMBOLS:
+        raise HTTPException(status_code=400, detail=f"Unknown symbol '{symbol}'")
+    tf, default_limit = _TIMEFRAME_LIMITS[timeframe]
+    candles = bot.fetch_ohlcv(symbol, tf, limit or default_limit)
+    return live({"symbol": symbol, "timeframe": timeframe, "data": candles})
 
 
 @app.get("/bot/status")
 def bot_status():
-    return {"running": bot._running, "dry_run": bot.dry_run_mode}
+    return {"running": bot._running, "dry_run": bot.dry_run_mode,
+            "daily_pnl": round(bot._daily_pnl, 2), "paused_loss": bot._paused_loss}
 
 
 @app.post("/bot/stop")
 async def stop_bot():
-    """Halt the trading loop. No more automatic trades will be placed."""
     global bot_task
     bot.stop()
     if bot_task and not bot_task.done():
@@ -148,66 +183,45 @@ async def stop_bot():
             await bot_task
         except asyncio.CancelledError:
             pass
-    logger.info("Bot manually stopped")
     return {"running": False}
 
 
 @app.post("/bot/start")
 async def start_bot():
-    """Resume the trading loop."""
     global bot_task
     if not bot._running:
         bot_task = asyncio.create_task(bot.run_loop(interval=10))
-        logger.info("Bot manually started")
     return {"running": True}
 
 
 @app.post("/bot/liquidate")
-async def liquidate_all():
-    """
-    Sell ALL tracked crypto positions to EUR at market price.
-    Useful before withdrawing. Runs even in dry-run mode (simulated).
-    """
-    results = []
-    for symbol in SYMBOLS:
-        result = bot.execute_sell(symbol)
-        results.append({"symbol": symbol, **result})
+def liquidate_all():
+    results = [{"symbol": s, **bot.execute_sell(s, reason="liquidate")} for s in SYMBOLS]
     return {"results": results}
 
 
 @app.post("/trade")
 def manual_trade(req: TradeRequest):
     if req.symbol not in SYMBOLS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown symbol '{req.symbol}'. Tracked: {SYMBOLS}",
-        )
-    if req.side == "buy":
-        result = bot.execute_buy(req.symbol, req.amount_eur)
-    else:
-        result = bot.execute_sell(req.symbol, req.amount_crypto)
-
+        raise HTTPException(status_code=400, detail=f"Unknown symbol '{req.symbol}'")
+    result = (bot.execute_buy(req.symbol, req.amount_eur, reason="manual")
+              if req.side == "buy"
+              else bot.execute_sell(req.symbol, req.amount_crypto, reason="manual"))
     if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Trade failed"))
+        raise HTTPException(status_code=400, detail=result.get("error"))
     return result
 
 
 @app.post("/withdraw")
 def withdraw(req: WithdrawRequest):
     """
-    Withdraw to a pre-configured Kraken withdrawal address.
-
-    Steps to set up:
-    1. kraken.com → Funding → Withdraw → choose currency → Add Withdrawal Address
-    2. Give it a name (that name is the 'key' field here)
-    3. Call this endpoint with that key name and amount
-
-    Requires KRAKEN_API_KEY with 'Withdraw Funds' permission.
+    Withdraw to a pre-registered Kraken address.
+    Setup: Kraken → Funding → Withdraw → Add Withdrawal Address → give it a name.
+    That name is the 'key' field. Requires 'Withdraw Funds' API permission.
     """
     try:
         result = bot.exchange.withdraw(req.currency, req.amount, req.key)
-        logger.info("Withdrawal initiated: %s %s -> %s", req.amount, req.currency, req.key)
+        logger.info("Withdrawal: %.2f %s -> %s", req.amount, req.currency, req.key)
         return {"ok": True, "result": result}
     except Exception as e:
-        logger.error("Withdrawal failed: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
