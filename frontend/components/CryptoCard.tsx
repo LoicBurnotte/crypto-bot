@@ -57,7 +57,13 @@ function fmt(value: number | null, decimals = 2): string {
   });
 }
 
-export default function CryptoCard({ asset }: { asset: AssetStatus }) {
+export default function CryptoCard({
+  asset,
+  flash,
+}: {
+  asset: AssetStatus;
+  flash: "up" | "down" | null;
+}) {
   const [modal, setModal]     = useState<"buy" | "sell" | null>(null);
   const [toast, setToast]     = useState<{ msg: string; error: boolean } | null>(null);
 
@@ -78,7 +84,12 @@ export default function CryptoCard({ asset }: { asset: AssetStatus }) {
 
   return (
     <>
-      <article className={`${styles.card} ${asset.error ? styles.cardError : ""}`}>
+      <article className={[
+        styles.card,
+        asset.error ? styles.cardError : "",
+        flash === "up"   ? styles.flashUp   : "",
+        flash === "down" ? styles.flashDown : "",
+      ].join(" ")}>
 
         {/* Header */}
         <div className={styles.cardHeader}>
