@@ -40,11 +40,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Crypto Trading Bot", version="1.0.0", lifespan=lifespan)
 
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+wildcard = allowed_origins == ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    # allow_credentials=True is incompatible with allow_origins=["*"].
+    # Use explicit origins in ALLOWED_ORIGINS env var to enable credentials.
+    allow_credentials=not wildcard,
     allow_methods=["*"],
     allow_headers=["*"],
 )
