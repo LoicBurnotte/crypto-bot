@@ -40,20 +40,21 @@ crypto-bot/
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+.venv/Scripts/activate
 pip install -r requirements.txt
 cp .env.example .env   # fill in your Kraken keys
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8080
 ```
 
 ### Environment variables (Railway)
 
-| Variable | Description |
-|---|---|
-| `KRAKEN_API_KEY` | Kraken API key |
-| `KRAKEN_API_SECRET` | Kraken API secret |
-| `ALLOWED_ORIGINS` | Comma-separated allowed CORS origins (e.g. `https://your-app.vercel.app`) |
-| `PORT` | Set automatically by Railway |
+| Variable            | Description                                                               |
+| ------------------- | ------------------------------------------------------------------------- |
+| `KRAKEN_API_KEY`    | Kraken API key                                                            |
+| `KRAKEN_API_SECRET` | Kraken API secret                                                         |
+| `ALLOWED_ORIGINS`   | Comma-separated allowed CORS origins (e.g. `https://your-app.vercel.app`) |
+| `PORT`              | Set automatically by Railway                                              |
 
 ### Start command
 
@@ -76,8 +77,8 @@ npm run dev
 
 ### Environment variables (Vercel)
 
-| Variable | Description |
-|---|---|
+| Variable              | Description                                                     |
+| --------------------- | --------------------------------------------------------------- |
 | `NEXT_PUBLIC_API_URL` | Your Railway backend URL, e.g. `https://crypto-bot.railway.app` |
 
 ---
@@ -91,8 +92,8 @@ npm run dev
 
 ## API
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/` | GET | Health check |
-| `/status` | GET | Live asset data (price, highest, action, RSI) |
-| `/health` | GET | Liveness probe |
+| Endpoint  | Method | Description                                   |
+| --------- | ------ | --------------------------------------------- |
+| `/`       | GET    | Health check                                  |
+| `/status` | GET    | Live asset data (price, highest, action, RSI) |
+| `/health` | GET    | Liveness probe                                |
