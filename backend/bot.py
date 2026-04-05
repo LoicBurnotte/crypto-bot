@@ -101,6 +101,8 @@ class AssetState:
         # When True: trailing stop and take-profit are suspended.
         # The bot will only sell this asset once RSI >= RSI_OVERBOUGHT.
         self.hold_until_overbought: bool = False
+        # When True: bot skips all processing and trading for this symbol.
+        self.disabled: bool = False
 
     @property
     def unrealised_pnl_pct(self) -> Optional[float]:
@@ -126,6 +128,7 @@ class AssetState:
             "dry_run":               TRADE_AMOUNT_EUR <= 0,
             "hold_until_overbought": self.hold_until_overbought,
             "rsi_overbought_target": RSI_OVERBOUGHT,
+            "disabled":              self.disabled,
             "last_updated":          self.last_updated,
             "error":                 self.error,
         }
@@ -328,6 +331,8 @@ class TradingBot:
 
     def _process_symbol(self, symbol: str):
         state = self.states[symbol]
+        if state.disabled:
+            return   # skip all processing and trading for this symbol
         price = self._fetch_ticker(symbol)
         if price is None:
             state.error = "Failed to fetch price"

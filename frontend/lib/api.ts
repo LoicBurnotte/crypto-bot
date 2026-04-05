@@ -14,6 +14,7 @@ export interface AssetStatus {
   dry_run:               boolean;
   hold_until_overbought: boolean;
   rsi_overbought_target: number;
+  disabled:              boolean;
   last_updated:          string | null;
   error:                 string | null;
 }
@@ -25,11 +26,21 @@ export interface BotStatus {
   paused_loss:  boolean;
 }
 
-export interface PortfolioBalance { free: number; used: number; total: number; }
+export interface PortfolioBalance {
+  free:                number;
+  used:                number;
+  total:               number;
+  eur_price:           number | null;
+  eur_value:           number | null;
+  unrealised_pnl_eur:  number | null;
+}
+
 export interface Portfolio {
-  balances:     Record<string, PortfolioBalance>;
-  daily_pnl:    number;
-  paused_loss:  boolean;
+  balances:      Record<string, PortfolioBalance>;
+  total_eur:     number;
+  daily_pnl:     number;
+  all_time_pnl:  number;
+  paused_loss:   boolean;
 }
 
 export interface Trade {
@@ -105,6 +116,10 @@ export function executeTrade(symbol: string, side: "buy" | "sell", amount_eur?: 
 
 export function setHoldUntilOverbought(symbol: string, enabled: boolean): Promise<{ symbol: string; hold_until_overbought: boolean; rsi_target: number }> {
   return apiFetch(`/bot/hold/${encodeURIComponent(symbol)}?enabled=${enabled}`, { method: "POST" });
+}
+
+export function setSymbolDisabled(symbol: string, disabled: boolean): Promise<{ symbol: string; disabled: boolean }> {
+  return apiFetch(`/bot/symbol/${encodeURIComponent(symbol)}?disabled=${disabled}`, { method: "POST" });
 }
 
 export function withdrawEur(amount: number, key: string): Promise<{ ok: boolean }> {

@@ -1,5 +1,4 @@
 .wrapper {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -22,11 +21,11 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .dot {
-  width: 9px;
-  height: 9px;
+  width: 9px; height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
   animation: pulse 2s infinite;
@@ -37,27 +36,19 @@
   50%       { opacity: 0.35; }
 }
 
-.statusLabel {
-  font-size: 0.9rem;
-  font-weight: 600;
-}
+.statusLabel { font-size: 0.9rem; font-weight: 600; }
 
-.dryRunTag {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--yellow);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 999px;
+.tag {
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid;
+  background: transparent;
 }
 
-.actionGroup {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
+.actionGroup { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 
 /* ── Buttons ─────────────────────────────────────────── */
 .btn {
@@ -71,11 +62,7 @@
   white-space: nowrap;
 }
 
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn:not(:disabled):hover  { opacity: 0.82; }
 .btn:not(:disabled):active { transform: scale(0.97); }
 
@@ -83,43 +70,124 @@
 .btnStop    { background: rgba(239,68,68,0.15);  color: var(--red);    border: 1px solid rgba(239,68,68,0.3);  }
 .btnWarning { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
 .btnPrimary { background: rgba(59,130,246,0.15); color: var(--blue);   border: 1px solid rgba(59,130,246,0.3); }
-.btnCancel  { background: transparent;           color: var(--text-muted); border: 1px solid var(--border);    }
+.btnCancel  { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
 
-/* ── Portfolio ───────────────────────────────────────── */
-.portfolio {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+.reloadBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.55rem;
+  transition: color 0.15s;
 }
 
-.portfolioItem {
+.reloadBtn:hover { color: var(--text); border-color: #3a3d52; }
+
+/* ── Portfolio card ──────────────────────────────────── */
+.portfolioCard {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.55rem 0.9rem;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.portfolioHeader {
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 110px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.portfolioLabel {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.portfolioTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.portfolioValue {
-  font-size: 0.95rem;
-  font-weight: 700;
+.portfolioTotal {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.portfolioTotal strong {
+  font-size: 1.2rem;
   font-variant-numeric: tabular-nums;
 }
 
-.portfolioUsed {
-  font-size: 0.72rem;
+/* ── P&L summary row ─────────────────────────────────── */
+.pnlRow {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pnlItem {
+  flex: 1;
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  border-right: 1px solid var(--border);
+}
+
+.pnlItem:last-child { border-right: none; }
+
+.pnlLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
-  font-weight: 400;
+}
+
+/* ── Asset table ─────────────────────────────────────── */
+.tableWrap { overflow-x: auto; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.table th {
+  padding: 0.5rem 1.25rem;
+  text-align: left;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+
+.table td {
+  padding: 0.55rem 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  vertical-align: middle;
+}
+
+.table tr:last-child td { border-bottom: none; }
+
+.right { text-align: right; }
+
+.assetName { font-weight: 700; }
+
+.eurRow td { background: rgba(59,130,246,0.04); }
+
+.muted { color: var(--text-muted); }
+
+/* ── Loss warning ────────────────────────────────────── */
+.lossWarning {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  color: var(--red);
+  background: rgba(239,68,68,0.07);
+  border-top: 1px solid rgba(239,68,68,0.2);
 }
 
 /* ── Toast ───────────────────────────────────────────── */
@@ -136,10 +204,10 @@
 
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0);    }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Modals ──────────────────────────────────────────── */
+/* ── Modal ───────────────────────────────────────────── */
 .overlay {
   position: fixed;
   inset: 0;
@@ -165,29 +233,14 @@
   box-shadow: 0 24px 64px rgba(0,0,0,0.5);
 }
 
-.modalTitle {
-  font-size: 1.1rem;
-  font-weight: 700;
-}
+.modalTitle { font-size: 1.1rem; font-weight: 700; }
 
-.modalBody {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  line-height: 1.65;
-}
+.modalBody { font-size: 0.875rem; color: var(--text-muted); line-height: 1.65; }
 
-.dryRunNote {
-  color: var(--yellow);
-  font-style: italic;
-}
+.dryNote { color: var(--yellow); font-style: italic; }
 
-.modalActions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
-}
+.modalActions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
 
-/* ── Form fields ─────────────────────────────────────── */
 .fieldLabel {
   display: flex;
   flex-direction: column;
@@ -212,8 +265,11 @@
 
 .input:focus { border-color: var(--blue); }
 
-@media (max-width: 600px) {
-  .controlBar  { flex-direction: column; align-items: flex-start; }
+@media (max-width: 700px) {
+  .pnlRow { flex-direction: column; }
+  .pnlItem { border-right: none; border-bottom: 1px solid var(--border); }
+  .pnlItem:last-child { border-bottom: none; }
+  .controlBar { flex-direction: column; align-items: flex-start; }
   .actionGroup { width: 100%; }
-  .btn         { flex: 1; text-align: center; }
+  .btn { flex: 1; text-align: center; }
 }

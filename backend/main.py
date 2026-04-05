@@ -126,18 +126,78 @@ def get_config():
 
 @app.get("/portfolio")
 def get_portfolio():
+    """
+    Returns full portfolio snapshot:
+    - Each asset: free / used / total quantity + EUR-converted value
+    - total_eur: sum of all assets in EUR
+    - unrealised_pnl_eur: based on entry prices tracked by the bot
+    - daily_pnl: realised P&L for today (from closed trades)
+    - all_time_pnl: sum of all pnl_eur entries in the trade log
+    """
     try:
         raw = bot.exchange.fetch_balance()
-        balances = {
-            k: {"free": v["free"], "used": v["used"], "total": v["total"]}
-            for k, v in raw.items()
-            if isinstance(v, dict)
-            and k not in {"info", "free", "used", "total", "timestamp", "datetime"}
-            and (v.get("total") or 0) > 0
-        }
-        return live({"balances": balances, "daily_pnl": round(bot._daily_pnl, 2),
-                     "paused_loss": bot._paused_loss})
+        _skip = {"info", "free", "used", "total", "timestamp", "datetime"}
+
+        # Build a price map from bot's live prices + fallback to Kraken
+        def eur_price(currency: str) -> Optional[float]:
+            if currency in ("EUR", "ZEUR"):
+                return 1.0
+            symbol = f"{currency}/EUR"
+            # Use the live price already tracked by the bot if available
+            state = bot.states.get(symbol)
+            if state and state.last_price:
+                return state.last_price
+            # Fallback: fetch from Kraken directly (for assets not in SYMBOLS)
+            try:
+                return float(bot.exchange.fetch_ticker(symbol)["last"])
+            except Exception:
+                return None
+
+        balances: dict = {}
+        total_eur = 0.0
+
+        for currency, info in raw.items():
+            if not isinstance(info, dict) or currency in _skip:
+                continue
+            total = info.get("total") or 0
+            if total <= 0:
+                continue
+
+            price = eur_price(currency)
+            eur_value = round(total * price, 2) if price is not None else None
+
+            # Entry-price based unrealised P&L for bot-tracked positions
+            symbol = f"{currency}/EUR"
+            state  = bot.states.get(symbol)
+            unreal_pnl_eur = None
+            if state and state.entry_price and state.last_price and total > 0:
+                unreal_pnl_eur = round((state.last_price - state.entry_price) * info.get("free", 0), 2)
+
+            balances[currency] = {
+                "free":            round(info["free"]  or 0, 8),
+                "used":            round(info["used"]  or 0, 8),
+                "total":           round(total, 8),
+                "eur_price":       round(price, 4) if price else None,
+                "eur_value":       eur_value,
+                "unrealised_pnl_eur": unreal_pnl_eur,
+            }
+            if eur_value is not None:
+                total_eur += eur_value
+
+        all_time_pnl = round(
+            sum(t.get("pnl_eur") or 0 for t in bot.trade_log.all()),
+            2,
+        )
+
+        return live({
+            "balances":       balances,
+            "total_eur":      round(total_eur, 2),
+            "daily_pnl":      round(bot._daily_pnl, 2),
+            "all_time_pnl":   all_time_pnl,
+            "paused_loss":    bot._paused_loss,
+        })
     except Exception as e:
+        logger.error("Portfolio fetch failed: %s", e)
         raise HTTPException(status_code=503, detail=str(e))
 
 
@@ -172,6 +232,16 @@ def get_ohlcv(
 def bot_status():
     return {"running": bot._running, "dry_run": bot.dry_run_mode,
             "daily_pnl": round(bot._daily_pnl, 2), "paused_loss": bot._paused_loss}
+
+
+@app.post("/bot/symbol/{symbol:path}")
+def set_symbol_state(symbol: str, disabled: bool):
+    """Enable or disable auto-trading for a single symbol (disabled=true/false)."""
+    if symbol not in SYMBOLS:
+        raise HTTPException(status_code=400, detail=f"Unknown symbol '{symbol}'")
+    bot.states[symbol].disabled = disabled
+    logger.info("Symbol %s disabled=%s", symbol, disabled)
+    return {"symbol": symbol, "disabled": disabled}
 
 
 @app.post("/bot/stop")

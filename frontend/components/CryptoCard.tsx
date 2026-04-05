@@ -2,7 +2,7 @@
 
 import { useState, lazy, Suspense } from "react";
 import type { AssetStatus } from "@/lib/api";
-import { setHoldUntilOverbought } from "@/lib/api";
+import { setHoldUntilOverbought, setSymbolDisabled } from "@/lib/api";
 import TradeModal from "./TradeModal";
 import styles from "./CryptoCard.module.css";
 
@@ -67,10 +67,11 @@ export default function CryptoCard({
   asset: AssetStatus;
   flash: "up" | "down" | null;
 }) {
-  const [modal,       setModal]       = useState<"buy" | "sell" | null>(null);
-  const [toast,       setToast]       = useState<{ msg: string; error: boolean } | null>(null);
-  const [showChart,   setShowChart]   = useState(false);
-  const [holdLoading, setHoldLoading] = useState(false);
+  const [modal,         setModal]         = useState<"buy" | "sell" | null>(null);
+  const [toast,         setToast]         = useState<{ msg: string; error: boolean } | null>(null);
+  const [showChart,     setShowChart]     = useState(false);
+  const [holdLoading,   setHoldLoading]   = useState(false);
+  const [disableLoading, setDisableLoading] = useState(false);
 
   const meta     = SYMBOL_META[asset.symbol] ?? { icon: "○", color: "var(--blue)" };
   const [base]   = asset.symbol.split("/");
@@ -91,7 +92,8 @@ export default function CryptoCard({
     <>
       <article className={[
         styles.card,
-        asset.error ? styles.cardError : "",
+        asset.error    ? styles.cardError    : "",
+        asset.disabled ? styles.cardDisabled : "",
         flash === "up"   ? styles.flashUp   : "",
         flash === "down" ? styles.flashDown : "",
       ].join(" ")}>
@@ -99,13 +101,32 @@ export default function CryptoCard({
         {/* Header */}
         <div className={styles.cardHeader}>
           <div className={styles.symbolGroup}>
-            <span className={styles.icon} style={{ color: meta.color }}>{meta.icon}</span>
+            <span className={styles.icon} style={{ color: meta.color, opacity: asset.disabled ? 0.4 : 1 }}>{meta.icon}</span>
             <div>
-              <div className={styles.symbolName}>{base}</div>
+              <div className={styles.symbolName} style={{ opacity: asset.disabled ? 0.5 : 1 }}>{base}</div>
               <div className={styles.pairLabel}>{asset.symbol}</div>
             </div>
           </div>
-          <ActionBadge action={asset.last_action} />
+          <div className={styles.headerRight}>
+            {!asset.disabled && <ActionBadge action={asset.last_action} />}
+            {asset.disabled  && <span className={styles.disabledBadge}>Paused</span>}
+            <button
+              className={`${styles.disableBtn} ${asset.disabled ? styles.disableBtnOff : ""}`}
+              disabled={disableLoading}
+              title={asset.disabled ? "Resume this symbol" : "Pause this symbol"}
+              onClick={async () => {
+                setDisableLoading(true);
+                try {
+                  await setSymbolDisabled(asset.symbol, !asset.disabled);
+                  showToast(asset.disabled ? `${base} resumed` : `${base} paused`, false);
+                } catch (e) {
+                  showToast(e instanceof Error ? e.message : "Failed", true);
+                } finally { setDisableLoading(false); }
+              }}
+            >
+              {disableLoading ? "…" : asset.disabled ? "▶" : "⏸"}
+            </button>
+          </div>
         </div>
 
         {/* Error */}
