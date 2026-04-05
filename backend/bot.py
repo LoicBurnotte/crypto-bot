@@ -421,19 +421,30 @@ class TradingBot:
     def get_status(self) -> list[dict]:
         return [s.to_dict() for s in self.states.values()]
 
+    async def _async_seed(self, symbol: str):
+        """Seed OHLCV + price history in a thread so the event loop stays free."""
+        try:
+            await asyncio.to_thread(self._seed_history, symbol)
+        except Exception as e:
+            logger.error("Seed failed %s: %s", symbol, e)
+
+    async def _async_process(self, symbol: str):
+        """Process one symbol in a thread so the event loop stays free."""
+        try:
+            await asyncio.to_thread(self._process_symbol, symbol)
+        except Exception as e:
+            logger.error("Error processing %s: %s", symbol, e)
+            self.states[symbol].error = str(e)
+
     async def run_loop(self, interval: int = 10):
         self._running = True
         logger.info("Bot started | symbols=%s | dry_run=%s", SYMBOLS, self.dry_run_mode)
-        for symbol in SYMBOLS:
-            self._seed_history(symbol)
+        # Seed all symbols concurrently without blocking the event loop
+        await asyncio.gather(*[self._async_seed(s) for s in SYMBOLS])
         while self._running:
             self._check_daily_reset()
-            for symbol in SYMBOLS:
-                try:
-                    self._process_symbol(symbol)
-                except Exception as e:
-                    logger.error("Error processing %s: %s", symbol, e)
-                    self.states[symbol].error = str(e)
+            # Process all symbols concurrently in threads
+            await asyncio.gather(*[self._async_process(s) for s in SYMBOLS])
             await asyncio.sleep(interval)
 
     def stop(self):

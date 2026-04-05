@@ -125,7 +125,7 @@ def get_config():
 
 
 @app.get("/portfolio")
-def get_portfolio():
+async def get_portfolio():
     """
     Returns full portfolio snapshot:
     - Each asset: free / used / total quantity + EUR-converted value
@@ -135,7 +135,7 @@ def get_portfolio():
     - all_time_pnl: sum of all pnl_eur entries in the trade log
     """
     try:
-        raw = bot.exchange.fetch_balance()
+        raw = await asyncio.to_thread(bot.exchange.fetch_balance)
         _skip = {"info", "free", "used", "total", "timestamp", "datetime"}
 
         # Build a price map from bot's live prices + fallback to Kraken
@@ -216,7 +216,7 @@ _TIMEFRAME_LIMITS = {
 }
 
 @app.get("/ohlcv")
-def get_ohlcv(
+async def get_ohlcv(
     symbol:    str = Query(..., example="BTC/EUR"),
     timeframe: str = Query("1h", pattern="^(1h|4h|1d|1w)$"),
     limit:     int = Query(0),
@@ -224,7 +224,7 @@ def get_ohlcv(
     if symbol not in SYMBOLS:
         raise HTTPException(status_code=400, detail=f"Unknown symbol '{symbol}'")
     tf, default_limit = _TIMEFRAME_LIMITS[timeframe]
-    candles = bot.fetch_ohlcv(symbol, tf, limit or default_limit)
+    candles = await asyncio.to_thread(bot.fetch_ohlcv, symbol, tf, limit or default_limit)
     return live({"symbol": symbol, "timeframe": timeframe, "data": candles})
 
 
