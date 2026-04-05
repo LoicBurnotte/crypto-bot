@@ -9,8 +9,11 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ── Config ────────────────────────────────────────────────────────────────────
-_raw_symbols = os.getenv("SYMBOLS", "BTC/EUR,ETH/EUR,SOL/EUR,XRP/EUR,ADA/EUR,DOT/EUR,LINK/EUR,MATIC/EUR")
+# ── Config (all overridable via env vars) ─────────────────────────────────────
+_raw_symbols = os.getenv(
+    "SYMBOLS",
+    "BTC/EUR,ETH/EUR,SOL/EUR,XRP/EUR,ADA/EUR,DOT/EUR,LINK/EUR",
+)
 SYMBOLS = [s.strip() for s in _raw_symbols.split(",") if s.strip()]
 
 TRAILING_STOP_PCT  = float(os.getenv("TRAILING_STOP_PCT",  "0.03"))

@@ -2,23 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchStatus, type AssetStatus } from "@/lib/api";
-import BotControls   from "./BotControls";
-import CryptoCard    from "./CryptoCard";
-import TradeHistory  from "./TradeHistory";
+import BotControls from "./BotControls";
+import CryptoCard from "./CryptoCard";
+import TradeHistory from "./TradeHistory";
 import styles from "./Dashboard.module.css";
 
 const POLL_INTERVAL = 3_000; // ms — matches bot tick (10 s) with buffer
 
 export default function Dashboard() {
-  const [assets,      setAssets]      = useState<AssetStatus[]>([]);
-  const [error,       setError]       = useState<string | null>(null);
+  const [assets, setAssets] = useState<AssetStatus[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [isLoading,   setIsLoading]   = useState(true);
-  const [countdown,   setCountdown]   = useState(POLL_INTERVAL / 1000);
+  const [isLoading, setIsLoading] = useState(true);
+  const [countdown, setCountdown] = useState(POLL_INTERVAL / 1000);
 
   // Track previous prices to animate change direction
   const prevPrices = useRef<Record<string, number>>({});
-  const [flashes,  setFlashes]  = useState<Record<string, "up" | "down">>({});
+  const [flashes, setFlashes] = useState<Record<string, "up" | "down">>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -48,7 +48,9 @@ export default function Dashboard() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     const t = setInterval(refresh, POLL_INTERVAL);
@@ -58,7 +60,7 @@ export default function Dashboard() {
   // Countdown ticker
   useEffect(() => {
     const t = setInterval(
-      () => setCountdown(c => (c > 1 ? c - 1 : POLL_INTERVAL / 1000)),
+      () => setCountdown((c) => (c > 1 ? c - 1 : POLL_INTERVAL / 1000)),
       1000,
     );
     return () => clearInterval(t);
@@ -75,7 +77,6 @@ export default function Dashboard() {
 
   return (
     <section className={styles.section}>
-
       {/* Bot controls + portfolio */}
       <BotControls />
 
@@ -84,12 +85,18 @@ export default function Dashboard() {
         <div className={styles.statusLeft}>
           {error ? (
             <span className={styles.statusError}>
-              <span className={styles.dot} style={{ background: "var(--red)" }} />
+              <span
+                className={styles.dot}
+                style={{ background: "var(--red)" }}
+              />
               API unreachable
             </span>
           ) : (
             <span className={styles.statusOk}>
-              <span className={styles.dot} style={{ background: "var(--green)" }} />
+              <span
+                className={styles.dot}
+                style={{ background: "var(--green)" }}
+              />
               Live · {assets.length} assets
             </span>
           )}
@@ -100,7 +107,13 @@ export default function Dashboard() {
               {lastRefresh.toLocaleTimeString()} · next in {countdown}s
             </span>
           )}
-          <button className={styles.refreshBtn} onClick={refresh} title="Refresh now">↻</button>
+          <button
+            className={styles.refreshBtn}
+            onClick={refresh}
+            title="Refresh now"
+          >
+            ↻
+          </button>
         </div>
       </div>
 
@@ -112,12 +125,14 @@ export default function Dashboard() {
       )}
 
       {/* Trade history (collapsible) */}
-      <TradeHistory />
+      <div className={styles.historyWrapper}>
+        <TradeHistory />
+      </div>
 
       {/* Cards grid */}
       {assets.length > 0 ? (
         <div className={styles.grid}>
-          {assets.map(asset => (
+          {assets.map((asset) => (
             <CryptoCard
               key={asset.symbol}
               asset={asset}
@@ -128,7 +143,9 @@ export default function Dashboard() {
       ) : (
         !error && (
           <div className={styles.centered}>
-            <p className={styles.loadingText}>No asset data yet — bot is starting up.</p>
+            <p className={styles.loadingText}>
+              No asset data yet — bot is starting up.
+            </p>
           </div>
         )
       )}

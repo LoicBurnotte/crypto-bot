@@ -201,7 +201,10 @@ export default function PriceChart({ symbol }: { symbol: string }) {
                 width={30}
               />
               <Tooltip
-                formatter={(v: number) => [v?.toFixed(1), "RSI"]}
+                formatter={(value) => [
+                  value != null && typeof value === "number" ? value.toFixed(1) : "—",
+                  "RSI",
+                ]}
                 labelFormatter={v => fmtTime(Number(v), tf)}
                 contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.78rem" }}
               />

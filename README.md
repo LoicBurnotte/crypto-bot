@@ -121,30 +121,30 @@ Dashboard is now at `http://localhost:3000`. You will be prompted to log in.
 
 ### Backend (Railway)
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `KRAKEN_API_KEY` | Yes (live) | — | Kraken API key |
-| `KRAKEN_API_SECRET` | Yes (live) | — | Kraken API secret |
-| `SYMBOLS` | No | `BTC/EUR,ETH/EUR,SOL/EUR,XRP/EUR,ADA/EUR,DOT/EUR,LINK/EUR,MATIC/EUR` | Comma-separated trading pairs |
-| `TRADE_AMOUNT_EUR` | No | `0` | EUR per auto-buy. **0 = dry-run (no real orders)** |
-| `TRAILING_STOP_PCT` | No | `0.03` | Sell when price drops this % from session high (3%) |
-| `TAKE_PROFIT_PCT` | No | `0.05` | Sell when price rises this % above entry (5%) |
-| `RSI_TIMEFRAME` | No | `1h` | Candle timeframe for RSI/EMA: `1h`, `4h`, or `1d` |
-| `RSI_PERIOD` | No | `14` | RSI period |
-| `RSI_OVERSOLD` | No | `30` | RSI buy threshold |
-| `RSI_OVERBOUGHT` | No | `70` | RSI sell threshold |
-| `EMA_FAST` | No | `9` | Fast EMA period |
-| `EMA_SLOW` | No | `21` | Slow EMA period |
-| `MAX_DAILY_LOSS_EUR` | No | `0` | Pause auto-trading if daily loss exceeds this EUR amount (0 = disabled) |
-| `WEBHOOK_URL` | No | — | Discord or Slack webhook URL for trade alerts |
+| Variable             | Required   | Default                                                              | Description                                                             |
+| -------------------- | ---------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `KRAKEN_API_KEY`     | Yes (live) | —                                                                    | Kraken API key                                                          |
+| `KRAKEN_API_SECRET`  | Yes (live) | —                                                                    | Kraken API secret                                                       |
+| `SYMBOLS`            | No         | `BTC/EUR,ETH/EUR,SOL/EUR,XRP/EUR,ADA/EUR,DOT/EUR,LINK/EUR,MATIC/EUR` | Comma-separated trading pairs                                           |
+| `TRADE_AMOUNT_EUR`   | No         | `0`                                                                  | EUR per auto-buy. **0 = dry-run (no real orders)**                      |
+| `TRAILING_STOP_PCT`  | No         | `0.03`                                                               | Sell when price drops this % from session high (3%)                     |
+| `TAKE_PROFIT_PCT`    | No         | `0.05`                                                               | Sell when price rises this % above entry (5%)                           |
+| `RSI_TIMEFRAME`      | No         | `1h`                                                                 | Candle timeframe for RSI/EMA: `1h`, `4h`, or `1d`                       |
+| `RSI_PERIOD`         | No         | `14`                                                                 | RSI period                                                              |
+| `RSI_OVERSOLD`       | No         | `30`                                                                 | RSI buy threshold                                                       |
+| `RSI_OVERBOUGHT`     | No         | `70`                                                                 | RSI sell threshold                                                      |
+| `EMA_FAST`           | No         | `9`                                                                  | Fast EMA period                                                         |
+| `EMA_SLOW`           | No         | `21`                                                                 | Slow EMA period                                                         |
+| `MAX_DAILY_LOSS_EUR` | No         | `0`                                                                  | Pause auto-trading if daily loss exceeds this EUR amount (0 = disabled) |
+| `WEBHOOK_URL`        | No         | —                                                                    | Discord or Slack webhook URL for trade alerts                           |
 
 ### Frontend (Vercel)
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | Yes | Your Railway backend URL, e.g. `https://your-app.railway.app` |
-| `AUTH_PASSWORD` | Yes | Dashboard login password (you choose this) |
-| `AUTH_SECRET` | Yes | Random 32+ char string used to sign JWT sessions |
+| Variable              | Required | Description                                                   |
+| --------------------- | -------- | ------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL` | Yes      | Your Railway backend URL, e.g. `https://your-app.railway.app` |
+| `AUTH_PASSWORD`       | Yes      | Dashboard login password (you choose this)                    |
+| `AUTH_SECRET`         | Yes      | Random 32+ char string used to sign JWT sessions              |
 
 > Generate a secure `AUTH_SECRET` with: `openssl rand -base64 32`
 
@@ -172,10 +172,10 @@ Sleep 10 seconds → repeat
 
 The bot keeps two completely separate data series to avoid timeframe contamination:
 
-| History | Updated | Used for |
-|---|---|---|
-| **Live price history** | Every 10 s tick | Trailing-stop tracking, session high |
-| **OHLCV candle history** | Every candle close (e.g. every hour for `1h`) | RSI and EMA calculations |
+| History                  | Updated                                       | Used for                             |
+| ------------------------ | --------------------------------------------- | ------------------------------------ |
+| **Live price history**   | Every 10 s tick                               | Trailing-stop tracking, session high |
+| **OHLCV candle history** | Every candle close (e.g. every hour for `1h`) | RSI and EMA calculations             |
 
 This ensures RSI is always computed on consistent candle data — never polluted by 10-second ticks.
 
@@ -185,13 +185,14 @@ This ensures RSI is always computed on consistent candle data — never polluted
 
 The RSI and EMA are computed on **OHLCV candle closes** fetched directly from Kraken, not on the live tick stream. The candle timeframe is controlled by `RSI_TIMEFRAME`:
 
-| `RSI_TIMEFRAME` | RSI(14) looks back | Signal frequency | Best for |
-|---|---|---|---|
-| `1h` **(default)** | ~14 hours | Higher, more noise | Active intraday trading |
-| `4h` | ~2.5 days | Balanced | Swing trading |
-| `1d` | ~14 days | Lower, more reliable | Position / long-term trading |
+| `RSI_TIMEFRAME`    | RSI(14) looks back | Signal frequency     | Best for                     |
+| ------------------ | ------------------ | -------------------- | ---------------------------- |
+| `1h` **(default)** | ~14 hours          | Higher, more noise   | Active intraday trading      |
+| `4h`               | ~2.5 days          | Balanced             | Swing trading                |
+| `1d`               | ~14 days           | Lower, more reliable | Position / long-term trading |
 
 The OHLCV history is refreshed automatically every time one candle closes:
+
 - `1h` → refreshed every 360 bot ticks (360 × 10 s = 1 hour)
 - `4h` → refreshed every 1440 bot ticks
 - `1d` → refreshed every 8640 bot ticks
@@ -205,49 +206,52 @@ The OHLCV history is refreshed automatically every time one candle closes:
 All three signals must be evaluated together. No single indicator triggers a trade alone.
 
 ### BUY signal fires when ALL of:
+
 - RSI < `RSI_OVERSOLD` (30) — asset is oversold
 - EMA fast (9) > EMA slow (21) — short-term trend is bullish (upward crossover)
 - Previous action was SELL — avoids buying into an already-open position
 
 ### SELL signal fires when ANY of:
-| Reason | Condition |
-|---|---|
-| **Trailing stop** | Price dropped ≥ `TRAILING_STOP_PCT` (3%) from session high |
-| **Take profit** | Price rose ≥ `TAKE_PROFIT_PCT` (5%) above entry price |
-| **RSI overbought** | RSI > `RSI_OVERBOUGHT` (70) |
+
+| Reason             | Condition                                                  |
+| ------------------ | ---------------------------------------------------------- |
+| **Trailing stop**  | Price dropped ≥ `TRAILING_STOP_PCT` (3%) from session high |
+| **Take profit**    | Price rose ≥ `TAKE_PROFIT_PCT` (5%) above entry price      |
+| **RSI overbought** | RSI > `RSI_OVERBOUGHT` (70)                                |
 
 ### HOLD
+
 Neither BUY nor SELL condition is met. No action taken.
 
 ---
 
 ## Risk management
 
-| Feature | How it works |
-|---|---|
-| **Dry-run mode** | Default (`TRADE_AMOUNT_EUR=0`). All signals fire and are logged, but no real orders are placed. Safe for testing. |
-| **Trailing stop** | Automatically sells if the price pulls back 3% from its peak. Protects profits. |
-| **Take profit** | Locks in gains at +5% above your entry price. |
+| Feature              | How it works                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Dry-run mode**     | Default (`TRADE_AMOUNT_EUR=0`). All signals fire and are logged, but no real orders are placed. Safe for testing.          |
+| **Trailing stop**    | Automatically sells if the price pulls back 3% from its peak. Protects profits.                                            |
+| **Take profit**      | Locks in gains at +5% above your entry price.                                                                              |
 | **Daily loss limit** | If `MAX_DAILY_LOSS_EUR` is set, auto-trading pauses for the rest of the day once the threshold is hit. Resets at midnight. |
-| **Manual override** | Buy/Sell buttons on every card let you override the bot at any time. |
+| **Manual override**  | Buy/Sell buttons on every card let you override the bot at any time.                                                       |
 
 ---
 
 ## Dashboard features
 
-| Feature | Description |
-|---|---|
-| **Login** | JWT session protected by password. httpOnly cookie, 7-day expiry. |
-| **Bot controls** | Start / Stop the trading loop without redeploying. |
-| **Portfolio** | Live free/used/total balances fetched from Kraken (requires API keys). |
-| **Sell All to EUR** | One-click market-sell of all tracked positions. |
-| **Withdraw EUR** | Send EUR to a pre-registered Kraken bank account. |
-| **Price chart** | Hidden by default. Click "Show chart" per card. Timeframes: 1D / 1W / 1M / 1Y. |
-| **RSI chart** | Displayed below price chart with reference lines at 30 (oversold), 50 (neutral), 70 (overbought). |
-| **EMA overlay** | EMA 9 (amber) and EMA 21 (purple) overlaid on price chart. |
-| **Trade history** | Collapsible table of all executed trades with side, price, amount, P&L, signal reason. |
-| **Price flash** | Card border flashes green on price rise, red on price drop every tick. |
-| **Auto-refresh** | Dashboard polls the backend every 3 seconds. |
+| Feature             | Description                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| **Login**           | JWT session protected by password. httpOnly cookie, 7-day expiry.                                 |
+| **Bot controls**    | Start / Stop the trading loop without redeploying.                                                |
+| **Portfolio**       | Live free/used/total balances fetched from Kraken (requires API keys).                            |
+| **Sell All to EUR** | One-click market-sell of all tracked positions.                                                   |
+| **Withdraw EUR**    | Send EUR to a pre-registered Kraken bank account.                                                 |
+| **Price chart**     | Hidden by default. Click "Show chart" per card. Timeframes: 1D / 1W / 1M / 1Y.                    |
+| **RSI chart**       | Displayed below price chart with reference lines at 30 (oversold), 50 (neutral), 70 (overbought). |
+| **EMA overlay**     | EMA 9 (amber) and EMA 21 (purple) overlaid on price chart.                                        |
+| **Trade history**   | Collapsible table of all executed trades with side, price, amount, P&L, signal reason.            |
+| **Price flash**     | Card border flashes green on price rise, red on price drop every tick.                            |
+| **Auto-refresh**    | Dashboard polls the backend every 3 seconds.                                                      |
 
 ---
 
@@ -255,30 +259,30 @@ Neither BUY nor SELL condition is met. No action taken.
 
 ### Public endpoints
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | Liveness probe — returns `{"healthy": true}` |
-| `GET` | `/status` | Live data for all assets (price, RSI, EMA, action, P&L) |
-| `GET` | `/config` | Current bot configuration (all env var values) |
-| `GET` | `/portfolio` | Kraken balances + daily P&L |
-| `GET` | `/trades` | Trade history. Query: `?limit=50` |
-| `GET` | `/ohlcv` | Candle data for charts. Query: `?symbol=BTC%2FEUR&timeframe=1h` |
+| Method | Endpoint     | Description                                                     |
+| ------ | ------------ | --------------------------------------------------------------- |
+| `GET`  | `/health`    | Liveness probe — returns `{"healthy": true}`                    |
+| `GET`  | `/status`    | Live data for all assets (price, RSI, EMA, action, P&L)         |
+| `GET`  | `/config`    | Current bot configuration (all env var values)                  |
+| `GET`  | `/portfolio` | Kraken balances + daily P&L                                     |
+| `GET`  | `/trades`    | Trade history. Query: `?limit=50`                               |
+| `GET`  | `/ohlcv`     | Candle data for charts. Query: `?symbol=BTC%2FEUR&timeframe=1h` |
 
 ### Bot control
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/bot/status` | Is the bot running? Dry-run? Daily P&L? |
-| `POST` | `/bot/start` | Resume the trading loop |
-| `POST` | `/bot/stop` | Pause the trading loop (no orders placed while stopped) |
-| `POST` | `/bot/liquidate` | Market-sell ALL positions to EUR immediately |
+| Method | Endpoint         | Description                                             |
+| ------ | ---------------- | ------------------------------------------------------- |
+| `GET`  | `/bot/status`    | Is the bot running? Dry-run? Daily P&L?                 |
+| `POST` | `/bot/start`     | Resume the trading loop                                 |
+| `POST` | `/bot/stop`      | Pause the trading loop (no orders placed while stopped) |
+| `POST` | `/bot/liquidate` | Market-sell ALL positions to EUR immediately            |
 
 ### Trading
 
-| Method | Endpoint | Body | Description |
-|---|---|---|---|
-| `POST` | `/trade` | `{"symbol":"BTC/EUR","side":"buy","amount_eur":50}` | Manual buy or sell |
-| `POST` | `/withdraw` | `{"currency":"EUR","amount":500,"key":"my-bank"}` | Withdraw to Kraken bank account |
+| Method | Endpoint    | Body                                                | Description                     |
+| ------ | ----------- | --------------------------------------------------- | ------------------------------- |
+| `POST` | `/trade`    | `{"symbol":"BTC/EUR","side":"buy","amount_eur":50}` | Manual buy or sell              |
+| `POST` | `/withdraw` | `{"currency":"EUR","amount":500,"key":"my-bank"}`   | Withdraw to Kraken bank account |
 
 ---
 
@@ -292,12 +296,12 @@ Go to [kraken.com](https://www.kraken.com) → Account → Security → API → 
 
 Enable only the permissions you need:
 
-| Permission | Required for |
-|---|---|
-| Query Funds | Portfolio endpoint, balance checks |
-| Query Open Orders & Trades | Trade history |
-| Create & Modify Orders | Auto-trading, manual Buy/Sell buttons |
-| Withdraw Funds | `/withdraw` endpoint only |
+| Permission                 | Required for                          |
+| -------------------------- | ------------------------------------- |
+| Query Funds                | Portfolio endpoint, balance checks    |
+| Query Open Orders & Trades | Trade history                         |
+| Create & Modify Orders     | Auto-trading, manual Buy/Sell buttons |
+| Withdraw Funds             | `/withdraw` endpoint only             |
 
 **Step 2 — Set Railway env vars**
 
@@ -343,6 +347,7 @@ Works with **Discord** and **Slack** out of the box:
 **Slack:** [Create an incoming webhook](https://api.slack.com/messaging/webhooks) → Copy URL
 
 Example notification:
+
 ```
 🟢 BUY BTC/EUR | €50.00 @ 58432.0000 | Reason: rsi_oversold+ema_bullish
 🔴 SELL BTC/EUR | 0.000856 BTC @ 61154.0000 | P&L: +23.17 EUR | Reason: take_profit (5%)
