@@ -1,26 +1,45 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchStatus, type AssetStatus } from "@/lib/api";
-import CryptoCard from "./CryptoCard";
+import BotControls from "./BotControls";
+import CryptoCard   from "./CryptoCard";
 import styles from "./Dashboard.module.css";
 
-const REFRESH_INTERVAL_MS = 5000;
+const POLL_INTERVAL = 3_000; // ms — matches bot tick (10 s) with buffer
 
 export default function Dashboard() {
-  const [assets, setAssets] = useState<AssetStatus[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [assets,      setAssets]      = useState<AssetStatus[]>([]);
+  const [error,       setError]       = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [countdown, setCountdown] = useState(REFRESH_INTERVAL_MS / 1000);
+  const [isLoading,   setIsLoading]   = useState(true);
+  const [countdown,   setCountdown]   = useState(POLL_INTERVAL / 1000);
+
+  // Track previous prices to animate change direction
+  const prevPrices = useRef<Record<string, number>>({});
+  const [flashes,  setFlashes]  = useState<Record<string, "up" | "down">>({});
 
   const refresh = useCallback(async () => {
     try {
       const data = await fetchStatus();
+
+      // Compute flash direction
+      const newFlashes: Record<string, "up" | "down"> = {};
+      for (const asset of data.assets) {
+        if (asset.last_price === null) continue;
+        const prev = prevPrices.current[asset.symbol];
+        if (prev !== undefined && prev !== asset.last_price) {
+          newFlashes[asset.symbol] = asset.last_price > prev ? "up" : "down";
+        }
+        prevPrices.current[asset.symbol] = asset.last_price;
+      }
+
       setAssets(data.assets);
+      setFlashes(newFlashes);
+      setTimeout(() => setFlashes({}), 800);
       setError(null);
       setLastRefresh(new Date());
-      setCountdown(REFRESH_INTERVAL_MS / 1000);
+      setCountdown(POLL_INTERVAL / 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -28,23 +47,20 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Initial fetch
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  // Auto-refresh every 5 s
   useEffect(() => {
-    const interval = setInterval(refresh, REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
+    const t = setInterval(refresh, POLL_INTERVAL);
+    return () => clearInterval(t);
   }, [refresh]);
 
   // Countdown ticker
   useEffect(() => {
-    const tick = setInterval(() => {
-      setCountdown((c) => (c > 1 ? c - 1 : REFRESH_INTERVAL_MS / 1000));
-    }, 1000);
-    return () => clearInterval(tick);
+    const t = setInterval(
+      () => setCountdown(c => (c > 1 ? c - 1 : POLL_INTERVAL / 1000)),
+      1000,
+    );
+    return () => clearInterval(t);
   }, [lastRefresh]);
 
   if (isLoading) {
@@ -58,30 +74,32 @@ export default function Dashboard() {
 
   return (
     <section className={styles.section}>
+
+      {/* Bot controls + portfolio */}
+      <BotControls />
+
       {/* Status bar */}
       <div className={styles.statusBar}>
         <div className={styles.statusLeft}>
           {error ? (
             <span className={styles.statusError}>
               <span className={styles.dot} style={{ background: "var(--red)" }} />
-              Connection error
+              API unreachable
             </span>
           ) : (
             <span className={styles.statusOk}>
               <span className={styles.dot} style={{ background: "var(--green)" }} />
-              Live
+              Live · {assets.length} assets
             </span>
           )}
         </div>
         <div className={styles.statusRight}>
           {lastRefresh && (
             <span className={styles.statusMeta}>
-              Last update: {lastRefresh.toLocaleTimeString()} · refreshing in {countdown}s
+              {lastRefresh.toLocaleTimeString()} · next in {countdown}s
             </span>
           )}
-          <button className={styles.refreshBtn} onClick={refresh} title="Refresh now">
-            ↻
-          </button>
+          <button className={styles.refreshBtn} onClick={refresh} title="Refresh now">↻</button>
         </div>
       </div>
 
@@ -95,8 +113,12 @@ export default function Dashboard() {
       {/* Cards grid */}
       {assets.length > 0 ? (
         <div className={styles.grid}>
-          {assets.map((asset) => (
-            <CryptoCard key={asset.symbol} asset={asset} />
+          {assets.map(asset => (
+            <CryptoCard
+              key={asset.symbol}
+              asset={asset}
+              flash={flashes[asset.symbol] ?? null}
+            />
           ))}
         </div>
       ) : (

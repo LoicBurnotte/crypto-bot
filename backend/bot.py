@@ -105,7 +105,8 @@ class TradingBot:
         })
         self.states:         dict[str, AssetState]    = {s: AssetState(s) for s in SYMBOLS}
         self._price_history: dict[str, list[float]]   = {s: []            for s in SYMBOLS}
-        self._running = False
+        self._running     = False
+        self.dry_run_mode = TRADE_AMOUNT_EUR <= 0
 
     # ── Exchange helpers ──────────────────────────────────────────────────────
 
