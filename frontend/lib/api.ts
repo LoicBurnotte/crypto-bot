@@ -11,9 +11,11 @@ export interface AssetStatus {
   ema_slow:            number | null;
   drop_pct:            number | null;
   unrealised_pnl_pct:  number | null;
-  dry_run:             boolean;
-  last_updated:        string | null;
-  error:               string | null;
+  dry_run:               boolean;
+  hold_until_overbought: boolean;
+  rsi_overbought_target: number;
+  last_updated:          string | null;
+  error:                 string | null;
 }
 
 export interface BotStatus {
@@ -99,6 +101,10 @@ export function executeTrade(symbol: string, side: "buy" | "sell", amount_eur?: 
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ symbol, side, amount_eur }),
   });
+}
+
+export function setHoldUntilOverbought(symbol: string, enabled: boolean): Promise<{ symbol: string; hold_until_overbought: boolean; rsi_target: number }> {
+  return apiFetch(`/bot/hold/${encodeURIComponent(symbol)}?enabled=${enabled}`, { method: "POST" });
 }
 
 export function withdrawEur(amount: number, key: string): Promise<{ ok: boolean }> {

@@ -195,6 +195,21 @@ async def start_bot():
     return {"running": True}
 
 
+@app.post("/bot/hold/{symbol:path}")
+def set_hold_until_overbought(symbol: str, enabled: bool = True):
+    """
+    When enabled=true: suspend trailing-stop and take-profit for this asset.
+    The bot will only sell once RSI reaches the overbought threshold.
+    The flag auto-clears after the sell fires.
+    """
+    if symbol not in SYMBOLS:
+        raise HTTPException(status_code=400, detail=f"Unknown symbol '{symbol}'")
+    bot.states[symbol].hold_until_overbought = enabled
+    logger.info("hold_until_overbought=%s for %s", enabled, symbol)
+    return {"symbol": symbol, "hold_until_overbought": enabled,
+            "rsi_target": RSI_OVERBOUGHT}
+
+
 @app.post("/bot/liquidate")
 def liquidate_all():
     results = [{"symbol": s, **bot.execute_sell(s, reason="liquidate")} for s in SYMBOLS]

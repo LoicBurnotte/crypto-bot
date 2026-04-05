@@ -98,6 +98,9 @@ class AssetState:
         self.ema_slow:     Optional[float] = None
         self.last_updated: Optional[str]   = None
         self.error:        Optional[str]   = None
+        # When True: trailing stop and take-profit are suspended.
+        # The bot will only sell this asset once RSI >= RSI_OVERBOUGHT.
+        self.hold_until_overbought: bool = False
 
     @property
     def unrealised_pnl_pct(self) -> Optional[float]:
@@ -119,10 +122,12 @@ class AssetState:
             "ema_fast":        round(self.ema_fast, 4)      if self.ema_fast is not None else None,
             "ema_slow":        round(self.ema_slow, 4)      if self.ema_slow is not None else None,
             "unrealised_pnl_pct": round(self.unrealised_pnl_pct, 2) if self.unrealised_pnl_pct is not None else None,
-            "drop_pct":        drop_pct,
-            "dry_run":         TRADE_AMOUNT_EUR <= 0,
-            "last_updated":    self.last_updated,
-            "error":           self.error,
+            "drop_pct":              drop_pct,
+            "dry_run":               TRADE_AMOUNT_EUR <= 0,
+            "hold_until_overbought": self.hold_until_overbought,
+            "rsi_overbought_target": RSI_OVERBOUGHT,
+            "last_updated":          self.last_updated,
+            "error":                 self.error,
         }
 
 
@@ -357,13 +362,27 @@ class TradingBot:
             state.last_action = "HOLD"
             return
 
-        drop_pct      = (state.highest - price) / state.highest if state.highest else 0
-        take_profit   = (state.entry_price and price >= state.entry_price * (1 + TAKE_PROFIT_PCT))
-        trailing_stop = drop_pct >= TRAILING_STOP_PCT
-        rsi_overbought = state.rsi is not None and state.rsi > RSI_OVERBOUGHT
+        drop_pct       = (state.highest - price) / state.highest if state.highest else 0
+        take_profit    = (state.entry_price and price >= state.entry_price * (1 + TAKE_PROFIT_PCT))
+        trailing_stop  = drop_pct >= TRAILING_STOP_PCT
+        rsi_overbought = state.rsi is not None and state.rsi >= RSI_OVERBOUGHT
         rsi_oversold   = state.rsi is not None and state.rsi < RSI_OVERSOLD
         ema_bullish    = (state.ema_fast is not None and state.ema_slow is not None
                          and state.ema_fast > state.ema_slow)
+
+        if state.hold_until_overbought:
+            # Trailing stop and take-profit are suspended.
+            # Only sell when RSI reaches overbought territory.
+            if rsi_overbought:
+                logger.info("%s hold_until_overbought: RSI=%.1f reached target (%.0f) — selling",
+                            symbol, state.rsi, RSI_OVERBOUGHT)
+                if state.last_action != "SELL":
+                    self.execute_sell(symbol, reason=f"hold_until_overbought (RSI={state.rsi:.1f})")
+                state.hold_until_overbought = False   # auto-clear after firing
+                state.last_action = "SELL"
+            else:
+                state.last_action = "HOLD"
+            return
 
         if take_profit:
             if state.last_action != "SELL":

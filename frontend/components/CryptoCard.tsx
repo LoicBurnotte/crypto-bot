@@ -2,6 +2,7 @@
 
 import { useState, lazy, Suspense } from "react";
 import type { AssetStatus } from "@/lib/api";
+import { setHoldUntilOverbought } from "@/lib/api";
 import TradeModal from "./TradeModal";
 import styles from "./CryptoCard.module.css";
 
@@ -66,9 +67,10 @@ export default function CryptoCard({
   asset: AssetStatus;
   flash: "up" | "down" | null;
 }) {
-  const [modal,     setModal]     = useState<"buy" | "sell" | null>(null);
-  const [toast,     setToast]     = useState<{ msg: string; error: boolean } | null>(null);
-  const [showChart, setShowChart] = useState(false);
+  const [modal,       setModal]       = useState<"buy" | "sell" | null>(null);
+  const [toast,       setToast]       = useState<{ msg: string; error: boolean } | null>(null);
+  const [showChart,   setShowChart]   = useState(false);
+  const [holdLoading, setHoldLoading] = useState(false);
 
   const meta     = SYMBOL_META[asset.symbol] ?? { icon: "○", color: "var(--blue)" };
   const [base]   = asset.symbol.split("/");
@@ -168,6 +170,52 @@ export default function CryptoCard({
             </span>
           </div>
         )}
+
+        {/* Hold until RSI overbought toggle */}
+        <div className={`${styles.holdRow} ${asset.hold_until_overbought ? styles.holdActive : ""}`}>
+          <div className={styles.holdInfo}>
+            <span className={styles.holdLabel}>
+              {asset.hold_until_overbought
+                ? `⏳ Holding — waiting for RSI ≥ ${asset.rsi_overbought_target}`
+                : "Hold until RSI overbought"}
+            </span>
+            {asset.hold_until_overbought && asset.rsi !== null && (
+              <div className={styles.rsiProgress}>
+                <div className={styles.rsiProgressTrack}>
+                  <div
+                    className={styles.rsiProgressFill}
+                    style={{ width: `${Math.min(100, (asset.rsi / asset.rsi_overbought_target) * 100)}%` }}
+                  />
+                </div>
+                <span className={styles.rsiProgressLabel}>
+                  {asset.rsi.toFixed(1)} / {asset.rsi_overbought_target}
+                </span>
+              </div>
+            )}
+          </div>
+          <button
+            className={`${styles.holdBtn} ${asset.hold_until_overbought ? styles.holdBtnActive : ""}`}
+            disabled={holdLoading}
+            onClick={async () => {
+              setHoldLoading(true);
+              try {
+                await setHoldUntilOverbought(asset.symbol, !asset.hold_until_overbought);
+                showToast(
+                  asset.hold_until_overbought
+                    ? `Hold mode OFF for ${base}`
+                    : `Hold mode ON — will sell ${base} at RSI ≥ ${asset.rsi_overbought_target}`,
+                  false,
+                );
+              } catch (e) {
+                showToast(e instanceof Error ? e.message : "Failed", true);
+              } finally {
+                setHoldLoading(false);
+              }
+            }}
+          >
+            {holdLoading ? "…" : asset.hold_until_overbought ? "Cancel" : "Enable"}
+          </button>
+        </div>
 
         {/* CTA buttons */}
         <div className={styles.ctaRow}>
