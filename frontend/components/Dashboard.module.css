@@ -97,6 +97,11 @@
   margin-bottom: 1.5rem;
 }
 
+/* ── Trade history ────────────────────────────────────── */
+.historyWrapper {
+  margin-bottom: 1.5rem;
+}
+
 /* ── Cards grid ──────────────────────────────────────── */
 .grid {
   display: flex;

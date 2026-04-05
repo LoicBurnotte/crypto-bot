@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import type { AssetStatus } from "@/lib/api";
+import { setHoldUntilOverbought } from "@/lib/api";
 import TradeModal from "./TradeModal";
 import styles from "./CryptoCard.module.css";
+
+const PriceChart = lazy(() => import("./PriceChart"));
 
 const SYMBOL_META: Record<string, { icon: string; color: string }> = {
   "BTC/EUR": { icon: "₿", color: "#f59e0b" },
@@ -70,6 +73,8 @@ export default function CryptoCard({
   const [toast, setToast] = useState<{ msg: string; error: boolean } | null>(
     null,
   );
+  const [showChart, setShowChart] = useState(false);
+  const [holdLoading, setHoldLoading] = useState(false);
 
   const meta = SYMBOL_META[asset.symbol] ?? { icon: "○", color: "var(--blue)" };
   const [base] = asset.symbol.split("/");
@@ -172,6 +177,26 @@ export default function CryptoCard({
           </div>
         )}
 
+        {/* Unrealised P&L */}
+        {asset.unrealised_pnl_pct !== null && asset.last_action === "BUY" && (
+          <div className={styles.dropRow}>
+            <span className={styles.label}>Unrealised P&amp;L</span>
+            <span
+              style={{
+                color:
+                  (asset.unrealised_pnl_pct ?? 0) >= 0
+                    ? "var(--green)"
+                    : "var(--red)",
+                fontWeight: 600,
+                fontSize: "0.875rem",
+              }}
+            >
+              {asset.unrealised_pnl_pct >= 0 ? "+" : ""}
+              {asset.unrealised_pnl_pct.toFixed(2)}%
+            </span>
+          </div>
+        )}
+
         {/* CTA buttons */}
         <div className={styles.ctaRow}>
           <button
@@ -189,6 +214,79 @@ export default function CryptoCard({
             Sell {base}
           </button>
         </div>
+
+        {/* Hold until RSI overbought toggle */}
+        <div
+          className={`${styles.holdRow} ${asset.hold_until_overbought ? styles.holdActive : ""}`}
+        >
+          <div className={styles.holdInfo}>
+            <span className={styles.holdLabel}>
+              {asset.hold_until_overbought
+                ? `⏳ Holding — waiting for RSI ≥ ${asset.rsi_overbought_target}`
+                : "Hold until RSI overbought"}
+            </span>
+            {asset.hold_until_overbought && asset.rsi !== null && (
+              <div className={styles.rsiProgress}>
+                <div className={styles.rsiProgressTrack}>
+                  <div
+                    className={styles.rsiProgressFill}
+                    style={{
+                      width: `${Math.min(100, (asset.rsi / asset.rsi_overbought_target) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <span className={styles.rsiProgressLabel}>
+                  {asset.rsi.toFixed(1)} / {asset.rsi_overbought_target}
+                </span>
+              </div>
+            )}
+          </div>
+          <button
+            className={`${styles.holdBtn} ${asset.hold_until_overbought ? styles.holdBtnActive : ""}`}
+            disabled={holdLoading}
+            onClick={async () => {
+              setHoldLoading(true);
+              try {
+                await setHoldUntilOverbought(
+                  asset.symbol,
+                  !asset.hold_until_overbought,
+                );
+                showToast(
+                  asset.hold_until_overbought
+                    ? `Hold mode OFF for ${base}`
+                    : `Hold mode ON — will sell ${base} at RSI ≥ ${asset.rsi_overbought_target}`,
+                  false,
+                );
+              } catch (e) {
+                showToast(e instanceof Error ? e.message : "Failed", true);
+              } finally {
+                setHoldLoading(false);
+              }
+            }}
+          >
+            {holdLoading
+              ? "…"
+              : asset.hold_until_overbought
+                ? "Cancel"
+                : "Enable"}
+          </button>
+        </div>
+
+        {/* Chart toggle */}
+        <button
+          className={styles.chartToggle}
+          onClick={() => setShowChart((s) => !s)}
+        >
+          {showChart ? "▲ Hide chart" : "▼ Show chart"}
+        </button>
+
+        {showChart && (
+          <Suspense
+            fallback={<div className={styles.chartLoading}>Loading chart…</div>}
+          >
+            <PriceChart symbol={asset.symbol} />
+          </Suspense>
+        )}
 
         {/* Dry-run indicator */}
         {asset.dry_run && (

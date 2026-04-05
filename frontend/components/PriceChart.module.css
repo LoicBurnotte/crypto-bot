@@ -1,0 +1,100 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.25rem;
+}
+
+/* ── Timeframe row ───────────────────────────────────── */
+.tfRow {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.tfBtn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.tfBtn:hover   { color: var(--text); border-color: #3a3d52; }
+.tfActive      { background: rgba(59,130,246,0.15); color: var(--blue); border-color: rgba(59,130,246,0.4); }
+
+.reloadBtn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+
+.reloadBtn:hover { color: var(--text); }
+
+/* ── Loader ──────────────────────────────────────────── */
+.loader {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.errMsg {
+  font-size: 0.8rem;
+  color: var(--red);
+  text-align: center;
+  padding: 1rem;
+}
+
+/* ── RSI label ───────────────────────────────────────── */
+.rsiLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding-left: 2px;
+}
+
+/* ── Tooltip ─────────────────────────────────────────── */
+.tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  min-width: 120px;
+}
+
+.tooltipTime {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-bottom: 0.3rem;
+}
+
+.tooltipRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
