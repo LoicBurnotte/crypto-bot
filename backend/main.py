@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from bot import (
     TradingBot, SYMBOLS,
     TRAILING_STOP_PCT, TAKE_PROFIT_PCT,
-    RSI_PERIOD, RSI_OVERSOLD, RSI_OVERBOUGHT,
+    RSI_PERIOD, RSI_OVERSOLD, RSI_OVERBOUGHT, RSI_TIMEFRAME,
     EMA_FAST, EMA_SLOW, TRADE_AMOUNT_EUR, MAX_DAILY_LOSS_EUR,
 )
 
@@ -113,6 +113,7 @@ def get_config():
         "trailing_stop_pct": TRAILING_STOP_PCT,
         "take_profit_pct":   TAKE_PROFIT_PCT,
         "rsi_period":        RSI_PERIOD,
+        "rsi_timeframe":     RSI_TIMEFRAME,
         "rsi_oversold":      RSI_OVERSOLD,
         "rsi_overbought":    RSI_OVERBOUGHT,
         "ema_fast":          EMA_FAST,

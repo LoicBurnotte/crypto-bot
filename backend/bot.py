@@ -24,6 +24,19 @@ TRADE_AMOUNT_EUR   = float(os.getenv("TRADE_AMOUNT_EUR",   "0"))
 MAX_DAILY_LOSS_EUR = float(os.getenv("MAX_DAILY_LOSS_EUR", "0"))   # 0 = disabled
 WEBHOOK_URL        = os.getenv("WEBHOOK_URL", "")                  # Discord / Slack
 
+# Timeframe used for RSI and EMA indicator calculations.
+# This is INDEPENDENT of the live price loop (which runs every 10 s).
+# Valid values: "1h" (default), "4h", "1d"
+# "1h"  → RSI(14) looks back ~14 hours  — short-term momentum
+# "4h"  → RSI(14) looks back ~2.5 days  — medium-term momentum
+# "1d"  → RSI(14) looks back ~14 days   — longer-term momentum
+RSI_TIMEFRAME = os.getenv("RSI_TIMEFRAME", "1h")
+
+# How many bot ticks between OHLCV refreshes for indicator recalculation.
+# 360 ticks × 10 s = 1 hour (aligns with the 1 h candle close by default).
+_OHLCV_REFRESH_MAP = {"1h": 360, "4h": 1440, "1d": 8640}
+OHLCV_REFRESH_TICKS = _OHLCV_REFRESH_MAP.get(RSI_TIMEFRAME, 360)
+
 
 # ── Indicators ────────────────────────────────────────────────────────────────
 
@@ -123,7 +136,17 @@ class TradingBot:
             "enableRateLimit": True,
         })
         self.states:          dict[str, AssetState]  = {s: AssetState(s) for s in SYMBOLS}
-        self._price_history:  dict[str, list[float]] = {s: []            for s in SYMBOLS}
+
+        # Live price history — updated every 10 s tick.
+        # Used ONLY for trailing-stop and session-high tracking.
+        self._price_history:  dict[str, list[float]] = {s: []  for s in SYMBOLS}
+
+        # OHLCV closes on RSI_TIMEFRAME candles — refreshed from Kraken periodically.
+        # RSI and EMA are computed exclusively from this data so the timeframe
+        # is always consistent (never polluted by 10-second live ticks).
+        self._ohlcv_history:  dict[str, list[float]] = {s: []  for s in SYMBOLS}
+        self._ohlcv_tick:     dict[str, int]          = {s: 0   for s in SYMBOLS}
+
         self.trade_log        = TradeLog()
         self._running         = False
         self.dry_run_mode     = TRADE_AMOUNT_EUR <= 0
@@ -169,13 +192,27 @@ class TradingBot:
             logger.warning("OHLCV fetch failed %s/%s: %s", symbol, timeframe, e)
             return []
 
-    def _seed_history(self, symbol: str):
+    def _refresh_ohlcv_history(self, symbol: str):
+        """
+        Fetch the latest OHLCV closes on RSI_TIMEFRAME and store them in
+        _ohlcv_history.  Called once at startup and then every
+        OHLCV_REFRESH_TICKS ticks so indicators stay on a consistent candle
+        timeframe regardless of how fast the live loop runs.
+        """
         try:
-            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe="1h", limit=100)
-            self._price_history[symbol] = [c[4] for c in ohlcv]
-            logger.info("Seeded %d candles for %s", len(ohlcv), symbol)
+            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe=RSI_TIMEFRAME, limit=100)
+            self._ohlcv_history[symbol] = [c[4] for c in ohlcv]
+            logger.info("OHLCV refreshed for %s (%s, %d candles)",
+                        symbol, RSI_TIMEFRAME, len(ohlcv))
         except Exception as e:
-            logger.warning("Seed failed for %s: %s", symbol, e)
+            logger.warning("OHLCV refresh failed %s: %s", symbol, e)
+
+    def _seed_history(self, symbol: str):
+        """Seed both live-price history and OHLCV history at startup."""
+        self._refresh_ohlcv_history(symbol)
+        # Initialise live price history from the same candles so trailing-stop
+        # has data immediately (will be replaced by real ticks quickly).
+        self._price_history[symbol] = list(self._ohlcv_history[symbol])
 
     def _get_balance(self, currency: str) -> float:
         try:
@@ -291,18 +328,27 @@ class TradingBot:
             state.error = "Failed to fetch price"
             return
 
-        state.error       = None
-        state.last_price  = price
+        state.error        = None
+        state.last_price   = price
         state.last_updated = datetime.utcnow().isoformat() + "Z"
 
+        # ── Live price history (trailing stop / session high) ─────────────────
         hist = self._price_history[symbol]
         hist.append(price)
-        if len(hist) > 200:
-            self._price_history[symbol] = hist[-200:]
+        if len(hist) > 500:
+            self._price_history[symbol] = hist[-500:]
 
-        state.rsi      = compute_rsi(hist)
-        state.ema_fast = compute_ema(hist, EMA_FAST)
-        state.ema_slow = compute_ema(hist, EMA_SLOW)
+        # ── OHLCV history refresh (RSI / EMA — consistent timeframe) ─────────
+        self._ohlcv_tick[symbol] += 1
+        if self._ohlcv_tick[symbol] >= OHLCV_REFRESH_TICKS:
+            self._ohlcv_tick[symbol] = 0
+            self._refresh_ohlcv_history(symbol)
+
+        # Indicators always computed on OHLCV closes (never live ticks)
+        ohlcv_hist = self._ohlcv_history[symbol]
+        state.rsi      = compute_rsi(ohlcv_hist)
+        state.ema_fast = compute_ema(ohlcv_hist, EMA_FAST)
+        state.ema_slow = compute_ema(ohlcv_hist, EMA_SLOW)
 
         if state.highest is None or price > state.highest:
             state.highest = price
