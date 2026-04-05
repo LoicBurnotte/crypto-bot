@@ -22,7 +22,10 @@
 .cardError {
   border-color: rgba(239, 68, 68, 0.4);
 }
-.cardDisabled { opacity: 0.55; border-style: dashed; }
+.cardDisabled {
+  opacity: 0.55;
+  border-style: dashed;
+}
 
 .flashUp {
   animation: flashUp 0.8s ease;
@@ -93,7 +96,7 @@
   letter-spacing: 0.04em;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: rgba(255,255,255,0.07);
+  background: rgba(255, 255, 255, 0.07);
   color: var(--text-muted);
   border: 1px solid var(--border);
 }
@@ -107,15 +110,24 @@
   font-size: 0.78rem;
   line-height: 1;
   padding: 0.25rem 0.45rem;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
 }
 
-.disableBtn:hover { color: var(--text); border-color: #3a3d52; }
-.disableBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.disableBtn:hover {
+  color: var(--text);
+  border-color: #3a3d52;
+}
+.disableBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 .disableBtnOff {
-  background: rgba(34,197,94,0.1);
-  border-color: rgba(34,197,94,0.3);
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
   color: var(--green);
 }
 
@@ -304,8 +316,10 @@
   padding: 0.6rem 0.75rem;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.02);
-  transition: border-color 0.2s, background 0.2s;
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 }
 
 .holdActive {
@@ -315,8 +329,13 @@
 }
 
 @keyframes holdPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
-  50%       { box-shadow: 0 0 8px 2px rgba(245,158,11,0.15); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.15);
+  }
 }
 
 .holdInfo {
@@ -378,23 +397,32 @@
   font-size: 0.78rem;
   font-weight: 600;
   padding: 0.3rem 0.7rem;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.holdBtn:disabled { opacity: 0.4; cursor: not-allowed; }
-.holdBtn:not(:disabled):hover { color: var(--text); border-color: #3a3d52; }
+.holdBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.holdBtn:not(:disabled):hover {
+  color: var(--text);
+  border-color: #3a3d52;
+}
 
 .holdBtnActive {
-  background: rgba(245,158,11,0.12);
-  border-color: rgba(245,158,11,0.4);
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
   color: var(--yellow);
 }
 
 .holdBtnActive:not(:disabled):hover {
-  background: rgba(239,68,68,0.12);
-  border-color: rgba(239,68,68,0.4);
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
   color: var(--red);
 }
 
@@ -409,7 +437,9 @@
   text-align: left;
   transition: color 0.15s;
 }
-.chartToggle:hover { color: var(--text); }
+.chartToggle:hover {
+  color: var(--text);
+}
 
 .chartLoading {
   font-size: 0.78rem;

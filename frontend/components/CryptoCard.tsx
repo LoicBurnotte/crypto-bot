@@ -48,7 +48,7 @@ function RsiBar({ rsi }: { rsi: number | null }) {
         />
       </div>
       <span style={{ color, fontWeight: 600, fontSize: "0.85rem" }}>
-        {rsi.toFixed(1)}
+        {rsi?.toFixed(1)}
       </span>
     </div>
   );
@@ -211,7 +211,7 @@ export default function CryptoCard({
               }}
             >
               {asset.unrealised_pnl_pct >= 0 ? "+" : ""}
-              {asset.unrealised_pnl_pct.toFixed(2)}%
+              {asset.unrealised_pnl_pct?.toFixed(2)}%
             </span>
           </div>
         )}
