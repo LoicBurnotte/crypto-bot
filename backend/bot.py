@@ -8,6 +8,7 @@ import ccxt
 import httpx
 
 from config import cfg
+from trade_store import TradeStore
 
 logger = logging.getLogger(__name__)
 
@@ -40,24 +41,6 @@ def compute_ema(prices: list[float], period: int) -> Optional[float]:
         ema = p * k + ema * (1 - k)
     return ema
 
-
-# ── Trade log ─────────────────────────────────────────────────────────────────
-
-class TradeLog:
-    MAX_ENTRIES = 500
-
-    def __init__(self):
-        self._trades: list[dict] = []
-
-    def record(self, **kwargs) -> dict:
-        entry = {"timestamp": datetime.utcnow().isoformat() + "Z", **kwargs}
-        self._trades.append(entry)
-        if len(self._trades) > self.MAX_ENTRIES:
-            self._trades = self._trades[-self.MAX_ENTRIES:]
-        return entry
-
-    def all(self) -> list[dict]:
-        return list(reversed(self._trades))
 
 
 # ── Asset state ───────────────────────────────────────────────────────────────
@@ -122,7 +105,7 @@ class TradingBot:
         self._ohlcv_history: dict[str, list[float]] = {s: [] for s in cfg.symbols}
         self._ohlcv_tick:    dict[str, int]          = {s: 0  for s in cfg.symbols}
 
-        self.trade_log     = TradeLog()
+        self.trade_log     = TradeStore()
         self._running      = False
         self._daily_pnl    = 0.0
         self._last_pnl_date = date.today()

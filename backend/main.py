@@ -225,7 +225,7 @@ async def get_portfolio():
             if eur_value is not None:
                 total_eur += eur_value
 
-        all_time_pnl = round(sum(t.get("pnl_eur") or 0 for t in bot.trade_log.all()), 2)
+        all_time_pnl = bot.trade_log.summary()["all_time_pnl"]
 
         return live({
             "balances":     balances,
@@ -240,9 +240,19 @@ async def get_portfolio():
 
 
 @app.get("/trades")
-def get_trades(limit: int = Query(50, le=500)):
-    trades = bot.trade_log.all()[:limit]
-    return live({"trades": trades, "total": len(bot.trade_log.all())})
+def get_trades(
+    limit:  int = Query(100, le=2000),
+    offset: int = Query(0, ge=0),
+):
+    all_trades = bot.trade_log.all()   # newest first
+    page = all_trades[offset: offset + limit]
+    return live({
+        "trades":  page,
+        "total":   bot.trade_log.count(),
+        "offset":  offset,
+        "limit":   limit,
+        **bot.trade_log.summary(),
+    })
 
 
 _TIMEFRAME_LIMITS = {

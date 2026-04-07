@@ -56,7 +56,16 @@ export interface Trade {
   order_id?:     string;
 }
 
-export interface TradeHistoryResponse { trades: Trade[]; total: number; }
+export interface TradeHistoryResponse {
+  trades:       Trade[];
+  total:        number;
+  offset:       number;
+  limit:        number;
+  buy_count:    number;
+  sell_count:   number;
+  live_trades:  number;
+  all_time_pnl: number;
+}
 
 export interface OhlcvCandle {
   timestamp: number;
@@ -119,7 +128,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export const fetchStatus    = () => apiFetch<{ assets: AssetStatus[] }>("/status");
 export const fetchBotStatus = () => apiFetch<BotStatus>("/bot/status");
 export const fetchPortfolio = () => apiFetch<Portfolio>("/portfolio");
-export const fetchTrades    = (limit = 50) => apiFetch<TradeHistoryResponse>(`/trades?limit=${limit}`);
+export const fetchTrades = (limit = 100, offset = 0) =>
+  apiFetch<TradeHistoryResponse>(`/trades?limit=${limit}&offset=${offset}`);
 export const fetchOhlcv     = (symbol: string, timeframe: string) =>
   apiFetch<OhlcvResponse>(`/ohlcv?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
 
