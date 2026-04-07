@@ -7,43 +7,16 @@ from typing import Optional
 import ccxt
 import httpx
 
+from config import cfg
+
 logger = logging.getLogger(__name__)
 
-# ── Config (all overridable via env vars) ─────────────────────────────────────
-_raw_symbols = os.getenv(
-    "SYMBOLS",
-    "BTC/EUR,ETH/EUR,SOL/EUR,XRP/EUR,ADA/EUR,DOT/EUR,LINK/EUR",
-)
-SYMBOLS = [s.strip() for s in _raw_symbols.split(",") if s.strip()]
-
-TRAILING_STOP_PCT  = float(os.getenv("TRAILING_STOP_PCT",  "0.03"))
-TAKE_PROFIT_PCT    = float(os.getenv("TAKE_PROFIT_PCT",    "0.05"))
-RSI_PERIOD         = int(os.getenv("RSI_PERIOD",           "14"))
-RSI_OVERSOLD       = float(os.getenv("RSI_OVERSOLD",       "30"))
-RSI_OVERBOUGHT     = float(os.getenv("RSI_OVERBOUGHT",     "70"))
-EMA_FAST           = int(os.getenv("EMA_FAST",             "9"))
-EMA_SLOW           = int(os.getenv("EMA_SLOW",             "21"))
-TRADE_AMOUNT_EUR   = float(os.getenv("TRADE_AMOUNT_EUR",   "0"))
-MAX_DAILY_LOSS_EUR = float(os.getenv("MAX_DAILY_LOSS_EUR", "0"))   # 0 = disabled
-WEBHOOK_URL        = os.getenv("WEBHOOK_URL", "")                  # Discord / Slack
-
-# Timeframe used for RSI and EMA indicator calculations.
-# This is INDEPENDENT of the live price loop (which runs every 10 s).
-# Valid values: "1h" (default), "4h", "1d"
-# "1h"  → RSI(14) looks back ~14 hours  — short-term momentum
-# "4h"  → RSI(14) looks back ~2.5 days  — medium-term momentum
-# "1d"  → RSI(14) looks back ~14 days   — longer-term momentum
-RSI_TIMEFRAME = os.getenv("RSI_TIMEFRAME", "1h")
-
-# How many bot ticks between OHLCV refreshes for indicator recalculation.
-# 360 ticks × 10 s = 1 hour (aligns with the 1 h candle close by default).
 _OHLCV_REFRESH_MAP = {"1h": 360, "4h": 1440, "1d": 8640}
-OHLCV_REFRESH_TICKS = _OHLCV_REFRESH_MAP.get(RSI_TIMEFRAME, 360)
 
 
 # ── Indicators ────────────────────────────────────────────────────────────────
 
-def compute_rsi(prices: list[float], period: int = RSI_PERIOD) -> Optional[float]:
+def compute_rsi(prices: list[float], period: int) -> Optional[float]:
     """Wilder's smoothed RSI."""
     if len(prices) < period + 1:
         return None
@@ -84,7 +57,7 @@ class TradeLog:
         return entry
 
     def all(self) -> list[dict]:
-        return list(reversed(self._trades))  # newest first
+        return list(reversed(self._trades))
 
 
 # ── Asset state ───────────────────────────────────────────────────────────────
@@ -94,18 +67,15 @@ class AssetState:
         self.symbol        = symbol
         self.last_price:   Optional[float] = None
         self.highest:      Optional[float] = None
-        self.entry_price:  Optional[float] = None   # price of last buy
+        self.entry_price:  Optional[float] = None
         self.last_action:  str             = "HOLD"
         self.rsi:          Optional[float] = None
         self.ema_fast:     Optional[float] = None
         self.ema_slow:     Optional[float] = None
         self.last_updated: Optional[str]   = None
         self.error:        Optional[str]   = None
-        # When True: trailing stop and take-profit are suspended.
-        # The bot will only sell this asset once RSI >= RSI_OVERBOUGHT.
-        self.hold_until_overbought: bool = False
-        # When True: bot skips all processing and trading for this symbol.
-        self.disabled: bool = False
+        self.hold_until_overbought: bool   = False
+        self.disabled:     bool            = False
 
     @property
     def unrealised_pnl_pct(self) -> Optional[float]:
@@ -118,19 +88,19 @@ class AssetState:
         if self.highest and self.last_price:
             drop_pct = round((self.highest - self.last_price) / self.highest * 100, 2)
         return {
-            "symbol":          self.symbol,
-            "last_price":      self.last_price,
-            "highest":         self.highest,
-            "entry_price":     self.entry_price,
-            "last_action":     self.last_action,
-            "rsi":             round(self.rsi, 2)           if self.rsi      is not None else None,
-            "ema_fast":        round(self.ema_fast, 4)      if self.ema_fast is not None else None,
-            "ema_slow":        round(self.ema_slow, 4)      if self.ema_slow is not None else None,
-            "unrealised_pnl_pct": round(self.unrealised_pnl_pct, 2) if self.unrealised_pnl_pct is not None else None,
+            "symbol":                self.symbol,
+            "last_price":            self.last_price,
+            "highest":               self.highest,
+            "entry_price":           self.entry_price,
+            "last_action":           self.last_action,
+            "rsi":                   round(self.rsi, 2)      if self.rsi      is not None else None,
+            "ema_fast":              round(self.ema_fast, 4) if self.ema_fast is not None else None,
+            "ema_slow":              round(self.ema_slow, 4) if self.ema_slow is not None else None,
+            "unrealised_pnl_pct":    round(self.unrealised_pnl_pct, 2) if self.unrealised_pnl_pct is not None else None,
             "drop_pct":              drop_pct,
-            "dry_run":               TRADE_AMOUNT_EUR <= 0,
+            "dry_run":               cfg.dry_run,
             "hold_until_overbought": self.hold_until_overbought,
-            "rsi_overbought_target": RSI_OVERBOUGHT,
+            "rsi_overbought_target": cfg.rsi_overbought,
             "disabled":              self.disabled,
             "last_updated":          self.last_updated,
             "error":                 self.error,
@@ -141,41 +111,55 @@ class AssetState:
 
 class TradingBot:
     def __init__(self):
+        key, secret = cfg.get_credentials()
         self.exchange = ccxt.kraken({
-            "apiKey":          os.getenv("KRAKEN_API_KEY", ""),
-            "secret":          os.getenv("KRAKEN_API_SECRET", ""),
+            "apiKey":          key,
+            "secret":          secret,
             "enableRateLimit": True,
         })
-        self.states:          dict[str, AssetState]  = {s: AssetState(s) for s in SYMBOLS}
+        self.states:         dict[str, AssetState]  = {s: AssetState(s) for s in cfg.symbols}
+        self._price_history: dict[str, list[float]] = {s: [] for s in cfg.symbols}
+        self._ohlcv_history: dict[str, list[float]] = {s: [] for s in cfg.symbols}
+        self._ohlcv_tick:    dict[str, int]          = {s: 0  for s in cfg.symbols}
 
-        # Live price history — updated every 10 s tick.
-        # Used ONLY for trailing-stop and session-high tracking.
-        self._price_history:  dict[str, list[float]] = {s: []  for s in SYMBOLS}
+        self.trade_log     = TradeLog()
+        self._running      = False
+        self._daily_pnl    = 0.0
+        self._last_pnl_date = date.today()
+        self._paused_loss  = False
 
-        # OHLCV closes on RSI_TIMEFRAME candles — refreshed from Kraken periodically.
-        # RSI and EMA are computed exclusively from this data so the timeframe
-        # is always consistent (never polluted by 10-second live ticks).
-        self._ohlcv_history:  dict[str, list[float]] = {s: []  for s in SYMBOLS}
-        self._ohlcv_tick:     dict[str, int]          = {s: 0   for s in SYMBOLS}
+    # ── Config reload ─────────────────────────────────────────────────────────
 
-        self.trade_log        = TradeLog()
-        self._running         = False
-        self.dry_run_mode     = TRADE_AMOUNT_EUR <= 0
-        self._daily_pnl       = 0.0
-        self._last_pnl_date   = date.today()
-        self._paused_loss     = False   # paused due to daily loss limit
+    def reload_exchange(self):
+        """Reinitialise the ccxt exchange with updated credentials from cfg."""
+        key, secret = cfg.get_credentials()
+        self.exchange = ccxt.kraken({
+            "apiKey":          key,
+            "secret":          secret,
+            "enableRateLimit": True,
+        })
+        logger.info("Exchange reloaded with updated credentials")
+
+    def sync_symbols(self):
+        """Add states for new symbols; preserve existing ones."""
+        for s in cfg.symbols:
+            if s not in self.states:
+                self.states[s]         = AssetState(s)
+                self._price_history[s] = []
+                self._ohlcv_history[s] = []
+                self._ohlcv_tick[s]    = 0
+                logger.info("Symbol added: %s", s)
 
     # ── Notifications ─────────────────────────────────────────────────────────
 
     async def _notify(self, text: str):
-        if not WEBHOOK_URL:
+        if not cfg.webhook_url:
             return
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                # Works for both Discord (?content) and Slack (?text) webhooks
-                await client.post(WEBHOOK_URL, json={"content": text, "text": text})
+                await client.post(cfg.webhook_url, json={"content": text, "text": text})
         except Exception as e:
-            logger.warning("Webhook notification failed: %s", e)
+            logger.warning("Webhook failed: %s", e)
 
     # ── Exchange helpers ──────────────────────────────────────────────────────
 
@@ -184,7 +168,7 @@ class TradingBot:
             return float(self.exchange.fetch_ticker(symbol)["last"])
         except ccxt.NetworkError  as e: logger.warning("Network error %s: %s",   symbol, e)
         except ccxt.ExchangeError as e: logger.warning("Exchange error %s: %s",  symbol, e)
-        except Exception          as e: logger.error("Unexpected error %s: %s", symbol, e)
+        except Exception          as e: logger.error("Unexpected error %s: %s",  symbol, e)
         return None
 
     def fetch_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 100) -> list[dict]:
@@ -194,8 +178,7 @@ class TradingBot:
                 {
                     "timestamp": int(c[0]),
                     "time":      datetime.utcfromtimestamp(c[0] / 1000).isoformat() + "Z",
-                    "open":      c[1], "high": c[2], "low": c[3],
-                    "close":     c[4], "volume": c[5],
+                    "open":  c[1], "high": c[2], "low": c[3], "close": c[4], "volume": c[5],
                 }
                 for c in raw
             ]
@@ -204,25 +187,15 @@ class TradingBot:
             return []
 
     def _refresh_ohlcv_history(self, symbol: str):
-        """
-        Fetch the latest OHLCV closes on RSI_TIMEFRAME and store them in
-        _ohlcv_history.  Called once at startup and then every
-        OHLCV_REFRESH_TICKS ticks so indicators stay on a consistent candle
-        timeframe regardless of how fast the live loop runs.
-        """
         try:
-            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe=RSI_TIMEFRAME, limit=100)
+            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe=cfg.rsi_timeframe, limit=100)
             self._ohlcv_history[symbol] = [c[4] for c in ohlcv]
-            logger.info("OHLCV refreshed for %s (%s, %d candles)",
-                        symbol, RSI_TIMEFRAME, len(ohlcv))
+            logger.info("OHLCV refreshed %s (%s, %d candles)", symbol, cfg.rsi_timeframe, len(ohlcv))
         except Exception as e:
             logger.warning("OHLCV refresh failed %s: %s", symbol, e)
 
     def _seed_history(self, symbol: str):
-        """Seed both live-price history and OHLCV history at startup."""
         self._refresh_ohlcv_history(symbol)
-        # Initialise live price history from the same candles so trailing-stop
-        # has data immediately (will be replaced by real ticks quickly).
         self._price_history[symbol] = list(self._ohlcv_history[symbol])
 
     def _get_balance(self, currency: str) -> float:
@@ -240,21 +213,19 @@ class TradingBot:
             self._daily_pnl     = 0.0
             self._last_pnl_date = today
             self._paused_loss   = False
-            logger.info("Daily P&L reset for new day")
+            logger.info("Daily P&L reset")
 
     def _record_pnl(self, pnl_eur: float):
         self._daily_pnl += pnl_eur
-        if MAX_DAILY_LOSS_EUR > 0 and self._daily_pnl <= -abs(MAX_DAILY_LOSS_EUR):
+        limit = cfg.max_daily_loss_eur
+        if limit > 0 and self._daily_pnl <= -abs(limit):
             self._paused_loss = True
-            logger.warning(
-                "Daily loss limit reached (%.2f EUR). Auto-trading paused until tomorrow.",
-                self._daily_pnl,
-            )
+            logger.warning("Daily loss limit reached (%.2f EUR). Bot paused.", self._daily_pnl)
 
     # ── Order execution ───────────────────────────────────────────────────────
 
     def execute_buy(self, symbol: str, amount_eur: Optional[float] = None, reason: str = "manual") -> dict:
-        eur   = amount_eur if (amount_eur and amount_eur > 0) else TRADE_AMOUNT_EUR
+        eur   = amount_eur if (amount_eur and amount_eur > 0) else cfg.trade_amount_eur
         price = self.states[symbol].last_price
         if not price:
             return {"ok": False, "error": "No price available"}
@@ -263,8 +234,8 @@ class TradingBot:
             entry = self.trade_log.record(symbol=symbol, side="buy", price=price,
                                           amount_eur=eur, dry_run=True, reason=reason)
             logger.info("[DRY RUN] Would BUY %.2f EUR of %s @ %.4f", eur, symbol, price)
-            self.states[symbol].entry_price  = price
-            self.states[symbol].last_action  = "BUY"
+            self.states[symbol].entry_price = price
+            self.states[symbol].last_action = "BUY"
             return {"ok": True, "dry_run": True, **entry}
 
         amount_crypto = eur / price
@@ -277,7 +248,7 @@ class TradingBot:
                                           amount_eur=eur, order_id=order.get("id"),
                                           dry_run=False, reason=reason)
             asyncio.create_task(self._notify(
-                f"🟢 BUY {symbol} | €{eur:.2f} @ {price:.4f} | Reason: {reason}"
+                f"🟢 BUY {symbol} | €{eur:.2f} @ {price:.4f} | {reason}"
             ))
             return {"ok": True, "dry_run": False, "order_id": order.get("id"), **entry}
         except ccxt.InsufficientFunds:
@@ -296,11 +267,10 @@ class TradingBot:
         if qty <= 0:
             qty = self._get_balance(base)
 
-        # P&L estimate
         entry_price = self.states[symbol].entry_price
         pnl_eur = (price - entry_price) * qty if entry_price else 0.0
 
-        if TRADE_AMOUNT_EUR <= 0:
+        if cfg.dry_run:
             entry = self.trade_log.record(symbol=symbol, side="sell", price=price,
                                           amount_crypto=qty, pnl_eur=0, dry_run=True, reason=reason)
             logger.info("[DRY RUN] Would SELL %.6f %s @ %.4f", qty, base, price)
@@ -319,11 +289,12 @@ class TradingBot:
             entry = self.trade_log.record(symbol=symbol, side="sell", price=price,
                                           amount_crypto=qty, pnl_eur=round(pnl_eur, 2),
                                           order_id=order.get("id"), dry_run=False, reason=reason)
-            pnl_str = f"P&L: {'+'if pnl_eur >= 0 else ''}{pnl_eur:.2f} EUR"
+            pnl_str = f"{'+'if pnl_eur >= 0 else ''}{pnl_eur:.2f} EUR"
             asyncio.create_task(self._notify(
-                f"🔴 SELL {symbol} | {qty:.6f} {base} @ {price:.4f} | {pnl_str} | Reason: {reason}"
+                f"🔴 SELL {symbol} | {qty:.6f} {base} @ {price:.4f} | P&L: {pnl_str} | {reason}"
             ))
-            return {"ok": True, "dry_run": False, "order_id": order.get("id"), "pnl_eur": round(pnl_eur, 2), **entry}
+            return {"ok": True, "dry_run": False, "order_id": order.get("id"),
+                    "pnl_eur": round(pnl_eur, 2), **entry}
         except ccxt.InsufficientFunds:
             return {"ok": False, "error": f"Insufficient {base} balance"}
         except Exception as e:
@@ -335,7 +306,8 @@ class TradingBot:
     def _process_symbol(self, symbol: str):
         state = self.states[symbol]
         if state.disabled:
-            return   # skip all processing and trading for this symbol
+            return
+
         price = self._fetch_ticker(symbol)
         if price is None:
             state.error = "Failed to fetch price"
@@ -345,23 +317,20 @@ class TradingBot:
         state.last_price   = price
         state.last_updated = datetime.utcnow().isoformat() + "Z"
 
-        # ── Live price history (trailing stop / session high) ─────────────────
         hist = self._price_history[symbol]
         hist.append(price)
         if len(hist) > 500:
             self._price_history[symbol] = hist[-500:]
 
-        # ── OHLCV history refresh (RSI / EMA — consistent timeframe) ─────────
         self._ohlcv_tick[symbol] += 1
-        if self._ohlcv_tick[symbol] >= OHLCV_REFRESH_TICKS:
+        if self._ohlcv_tick[symbol] >= cfg.ohlcv_refresh_ticks:
             self._ohlcv_tick[symbol] = 0
             self._refresh_ohlcv_history(symbol)
 
-        # Indicators always computed on OHLCV closes (never live ticks)
-        ohlcv_hist = self._ohlcv_history[symbol]
-        state.rsi      = compute_rsi(ohlcv_hist)
-        state.ema_fast = compute_ema(ohlcv_hist, EMA_FAST)
-        state.ema_slow = compute_ema(ohlcv_hist, EMA_SLOW)
+        ohlcv_hist     = self._ohlcv_history[symbol]
+        state.rsi      = compute_rsi(ohlcv_hist, cfg.rsi_period)
+        state.ema_fast = compute_ema(ohlcv_hist, cfg.ema_fast)
+        state.ema_slow = compute_ema(ohlcv_hist, cfg.ema_slow)
 
         if state.highest is None or price > state.highest:
             state.highest = price
@@ -371,22 +340,19 @@ class TradingBot:
             return
 
         drop_pct       = (state.highest - price) / state.highest if state.highest else 0
-        take_profit    = (state.entry_price and price >= state.entry_price * (1 + TAKE_PROFIT_PCT))
-        trailing_stop  = drop_pct >= TRAILING_STOP_PCT
-        rsi_overbought = state.rsi is not None and state.rsi >= RSI_OVERBOUGHT
-        rsi_oversold   = state.rsi is not None and state.rsi < RSI_OVERSOLD
+        take_profit    = bool(state.entry_price and price >= state.entry_price * (1 + cfg.take_profit_pct))
+        trailing_stop  = drop_pct >= cfg.trailing_stop_pct
+        rsi_overbought = state.rsi is not None and state.rsi >= cfg.rsi_overbought
+        rsi_oversold   = state.rsi is not None and state.rsi < cfg.rsi_oversold
         ema_bullish    = (state.ema_fast is not None and state.ema_slow is not None
                          and state.ema_fast > state.ema_slow)
 
         if state.hold_until_overbought:
-            # Trailing stop and take-profit are suspended.
-            # Only sell when RSI reaches overbought territory.
             if rsi_overbought:
-                logger.info("%s hold_until_overbought: RSI=%.1f reached target (%.0f) — selling",
-                            symbol, state.rsi, RSI_OVERBOUGHT)
+                logger.info("%s hold_until_overbought triggered at RSI=%.1f", symbol, state.rsi)
                 if state.last_action != "SELL":
                     self.execute_sell(symbol, reason=f"hold_until_overbought (RSI={state.rsi:.1f})")
-                state.hold_until_overbought = False   # auto-clear after firing
+                state.hold_until_overbought = False
                 state.last_action = "SELL"
             else:
                 state.last_action = "HOLD"
@@ -394,7 +360,7 @@ class TradingBot:
 
         if take_profit:
             if state.last_action != "SELL":
-                self.execute_sell(symbol, reason=f"take_profit ({TAKE_PROFIT_PCT*100:.0f}%)")
+                self.execute_sell(symbol, reason=f"take_profit ({cfg.take_profit_pct*100:.0f}%)")
             state.last_action = "SELL"
         elif trailing_stop or rsi_overbought:
             reason = "trailing_stop" if trailing_stop else "rsi_overbought"
@@ -408,13 +374,11 @@ class TradingBot:
         else:
             state.last_action = "HOLD"
 
-        logger.info(
-            "%s %.4f | action=%s rsi=%s drop=%.2f%% pnl=%s",
+        logger.info("%s %.4f | %s | RSI=%s drop=%.2f%% pnl=%s",
             symbol, price, state.last_action,
             f"{state.rsi:.1f}" if state.rsi else "N/A",
             drop_pct * 100,
-            f"{state.unrealised_pnl_pct:.2f}%" if state.unrealised_pnl_pct is not None else "N/A",
-        )
+            f"{state.unrealised_pnl_pct:.2f}%" if state.unrealised_pnl_pct is not None else "N/A")
 
     # ── Public ────────────────────────────────────────────────────────────────
 
@@ -422,14 +386,12 @@ class TradingBot:
         return [s.to_dict() for s in self.states.values()]
 
     async def _async_seed(self, symbol: str):
-        """Seed OHLCV + price history in a thread so the event loop stays free."""
         try:
             await asyncio.to_thread(self._seed_history, symbol)
         except Exception as e:
             logger.error("Seed failed %s: %s", symbol, e)
 
     async def _async_process(self, symbol: str):
-        """Process one symbol in a thread so the event loop stays free."""
         try:
             await asyncio.to_thread(self._process_symbol, symbol)
         except Exception as e:
@@ -438,13 +400,13 @@ class TradingBot:
 
     async def run_loop(self, interval: int = 10):
         self._running = True
-        logger.info("Bot started | symbols=%s | dry_run=%s", SYMBOLS, self.dry_run_mode)
-        # Seed all symbols concurrently without blocking the event loop
-        await asyncio.gather(*[self._async_seed(s) for s in SYMBOLS])
+        self.sync_symbols()
+        logger.info("Bot started | symbols=%s | dry_run=%s", cfg.symbols, cfg.dry_run)
+        await asyncio.gather(*[self._async_seed(s) for s in cfg.symbols])
         while self._running:
             self._check_daily_reset()
-            # Process all symbols concurrently in threads
-            await asyncio.gather(*[self._async_process(s) for s in SYMBOLS])
+            self.sync_symbols()
+            await asyncio.gather(*[self._async_process(s) for s in cfg.symbols])
             await asyncio.sleep(interval)
 
     def stop(self):
