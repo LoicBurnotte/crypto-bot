@@ -383,7 +383,47 @@
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 500px) {
+@media (max-width: 600px) {
+  /* Full-screen modal on mobile */
+  .overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+  }
+
+  /* More breathing room on small screens */
+  .header   { padding: 1.25rem 1rem 0.9rem; }
+  .body     { padding: 0 1rem; }
+  .section  { padding: 1rem 0; }
+  .footer   { padding: 0.9rem 1rem; }
+
+  /* Single column everywhere */
   .grid2    { grid-template-columns: 1fr; }
-  .profiles { grid-template-columns: 1fr; }
+  .profiles { grid-template-columns: 1fr 1fr; }
+
+  /* Tooltips: show above and keep within screen */
+  .tipBox {
+    left: auto;
+    right: 0;
+    transform: none;
+    max-width: min(260px, 80vw);
+  }
+
+  /* Symbol chips slightly smaller */
+  .symChip { font-size: 0.75rem; padding: 0.28rem 0.65rem; }
+
+  /* Toast full-width */
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    transform: none;
+    white-space: normal;
+    text-align: center;
+  }
 }
