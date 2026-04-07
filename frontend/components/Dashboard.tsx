@@ -5,6 +5,7 @@ import { fetchStatus, type AssetStatus } from "@/lib/api";
 import BotControls from "./BotControls";
 import CryptoCard from "./CryptoCard";
 import TradeHistory from "./TradeHistory";
+import SettingsModal from "./SettingsModal";
 import styles from "./Dashboard.module.css";
 
 const POLL_INTERVAL = 3_000; // ms — matches bot tick (10 s) with buffer
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [countdown, setCountdown] = useState(POLL_INTERVAL / 1000);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Track previous prices to animate change direction
   const prevPrices = useRef<Record<string, number>>({});
@@ -114,8 +116,18 @@ export default function Dashboard() {
           >
             ↻
           </button>
+          <button
+            className={styles.settingsBtn}
+            onClick={() => setShowSettings(true)}
+            title="Bot settings"
+            aria-label="Open settings"
+          >
+            ⚙
+          </button>
         </div>
       </div>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
       {/* Error banner */}
       {error && (

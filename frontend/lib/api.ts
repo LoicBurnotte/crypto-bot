@@ -81,6 +81,27 @@ export interface TradeResult {
 
 export interface LiquidateResult { results: (TradeResult & { symbol: string })[]; }
 
+export interface BotConfig {
+  symbols:            string[];
+  trade_amount_eur:   number;
+  trailing_stop_pct:  number;
+  take_profit_pct:    number;
+  rsi_period:         number;
+  rsi_oversold:       number;
+  rsi_overbought:     number;
+  rsi_timeframe:      "1h" | "4h" | "1d";
+  ema_fast:           number;
+  ema_slow:           number;
+  max_daily_loss_eur: number;
+  webhook_url:        string;
+  kraken_api_key:     string;
+  kraken_api_secret:  string;
+  dry_run:            boolean;
+}
+
+export type ProfileName = "conservative" | "moderate" | "aggressive" | "custom";
+export type Profiles = Record<ProfileName, Omit<BotConfig, "dry_run" | "kraken_api_key" | "kraken_api_secret">>;
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 const API_URL =
@@ -128,4 +149,19 @@ export function withdrawEur(amount: number, key: string): Promise<{ ok: boolean 
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ currency: "EUR", amount, key }),
   });
+}
+
+export const fetchConfig   = () => apiFetch<BotConfig>("/config");
+export const fetchProfiles = () => apiFetch<Profiles>("/config/profiles");
+
+export function updateConfig(data: Partial<BotConfig>): Promise<BotConfig> {
+  return apiFetch<BotConfig>("/config", {
+    method:  "PUT",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(data),
+  });
+}
+
+export function resetConfig(profile: ProfileName): Promise<BotConfig> {
+  return apiFetch<BotConfig>(`/config/reset/${profile}`, { method: "POST" });
 }
