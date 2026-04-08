@@ -4,13 +4,38 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchTrades, type Trade, type TradeHistoryResponse } from "@/lib/api";
 import styles from "./TradeHistory.module.css";
 
-const PAGE = 100;
+const PAGE    = 100;
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
+
+async function fetchYears(): Promise<number[]> {
+  try {
+    const res = await fetch(`${API_URL}/trades/years`, { cache: "no-store" });
+    const data = await res.json();
+    return data.years ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function downloadExport(year: number | "all", format: "csv" | "xlsx") {
+  const yearParam = year === "all" ? "" : `&year=${year}`;
+  const url = `${API_URL}/trades/export?format=${format}${yearParam}`;
+  // Trigger browser download
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 
 export default function TradeHistory() {
-  const [res,     setRes]     = useState<TradeHistoryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [open,    setOpen]    = useState(false);
-  const [offset,  setOffset]  = useState(0);
+  const [res,          setRes]          = useState<TradeHistoryResponse | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [open,         setOpen]         = useState(false);
+  const [offset,       setOffset]       = useState(0);
+  const [years,        setYears]        = useState<number[]>([]);
+  const [selectedYear, setSelectedYear] = useState<number | "all">("all");
 
   const load = useCallback(async (off = 0) => {
     try {
@@ -24,13 +49,16 @@ export default function TradeHistory() {
     }
   }, []);
 
-  useEffect(() => { load(0); }, [load]);
+  useEffect(() => { load(0); fetchYears().then(setYears); }, [load]);
 
   useEffect(() => {
     if (!open) return;
     const t = setInterval(() => load(offset), 10_000);
     return () => clearInterval(t);
   }, [open, load, offset]);
+
+  // Reload page 1 when year filter changes
+  useEffect(() => { load(0); }, [selectedYear, load]);
 
   const trades     = res?.trades ?? [];
   const total      = res?.total ?? 0;
@@ -88,6 +116,35 @@ export default function TradeHistory() {
               </span>
             </div>
             <button className={styles.reloadBtn} onClick={() => load(offset)}>↻</button>
+          </div>
+
+          {/* Export toolbar */}
+          <div className={styles.exportBar}>
+            <span className={styles.exportLabel}>Export:</span>
+            <select
+              className={styles.yearSelect}
+              value={selectedYear}
+              onChange={e => setSelectedYear(e.target.value === "all" ? "all" : Number(e.target.value))}
+            >
+              <option value="all">All years</option>
+              {years.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button
+              className={styles.exportBtn}
+              onClick={() => downloadExport(selectedYear, "csv")}
+              title="Download CSV"
+            >
+              ↓ CSV
+            </button>
+            <button
+              className={`${styles.exportBtn} ${styles.exportXlsx}`}
+              onClick={() => downloadExport(selectedYear, "xlsx")}
+              title="Download Excel"
+            >
+              ↓ Excel
+            </button>
           </div>
 
           {loading ? (
