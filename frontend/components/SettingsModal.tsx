@@ -8,10 +8,16 @@ import {
 import styles from "./SettingsModal.module.css";
 
 // ── Available trading pairs ───────────────────────────────────────────────────
+// Grouped by risk/liquidity for display
 const ALL_SYMBOLS = [
+  // High liquidity — lowest risk
   "BTC/EUR", "ETH/EUR", "SOL/EUR", "XRP/EUR",
-  "ADA/EUR", "DOT/EUR", "LINK/EUR", "MATIC/EUR",
-  "AVAX/EUR", "ATOM/EUR", "LTC/EUR", "BCH/EUR",
+  // Mid-cap — moderate
+  "ADA/EUR", "AVAX/EUR", "DOT/EUR", "ATOM/EUR",
+  "LINK/EUR", "LTC/EUR", "NEAR/EUR", "UNI/EUR",
+  // Smaller cap — higher volatility = more signals
+  "MATIC/EUR", "DOGE/EUR", "ALGO/EUR", "BCH/EUR",
+  "FIL/EUR",
 ];
 
 // ── Profile meta ──────────────────────────────────────────────────────────────

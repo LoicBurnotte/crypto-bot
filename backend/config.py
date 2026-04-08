@@ -23,7 +23,7 @@ CONFIG_PATH = Path(os.getenv("CONFIG_DIR", ".")) / "bot_config.json"
 
 PROFILES: dict[str, dict] = {
     "conservative": {
-        "symbols":           ["BTC/EUR", "ETH/EUR", "SOL/EUR"],
+        "symbols":           ["BTC/EUR", "ETH/EUR", "SOL/EUR", "XRP/EUR"],
         "trade_amount_eur":  10.0,
         "trailing_stop_pct": 0.02,
         "take_profit_pct":   0.03,
@@ -51,7 +51,7 @@ PROFILES: dict[str, dict] = {
         "webhook_url":       "",
     },
     "aggressive": {
-        "symbols":           ["BTC/EUR", "ETH/EUR", "SOL/EUR", "XRP/EUR", "ADA/EUR", "DOT/EUR"],
+        "symbols":           ["BTC/EUR", "ETH/EUR", "SOL/EUR", "XRP/EUR", "ADA/EUR", "DOT/EUR", "AVAX/EUR", "NEAR/EUR"],
         "trade_amount_eur":  50.0,
         "trailing_stop_pct": 0.05,
         "take_profit_pct":   0.08,

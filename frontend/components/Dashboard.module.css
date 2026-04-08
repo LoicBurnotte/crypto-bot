@@ -118,6 +118,100 @@
   margin-bottom: 1.5rem;
 }
 
+/* ── Sort / filter toolbar ───────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.filterChip {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.filterChip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+.filterActive {
+  background: rgba(59,130,246,0.15);
+  border-color: rgba(59,130,246,0.45);
+  color: var(--blue);
+}
+
+.chipCount {
+  background: rgba(59,130,246,0.2);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.05rem 0.45rem;
+}
+
+.sortLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.sortSelect {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  max-width: 190px;
+}
+.sortSelect:focus { outline: none; border-color: var(--blue); }
+
+/* ── Opportunity banner ──────────────────────────────── */
+.opportunityBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+
+.opBannerText {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 /* ── Cards grid ──────────────────────────────────────── */
 .grid {
   display: flex;
