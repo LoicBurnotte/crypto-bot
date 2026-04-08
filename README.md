@@ -1,5 +1,7 @@
 # Crypto Trading Bot
 
+**Live dashboard → [crypto-bot-phi-three.vercel.app](https://crypto-bot-phi-three.vercel.app/)**
+
 A full-stack automated crypto trading bot with a Python FastAPI backend and a Next.js 14 dashboard. Deploys to **Railway** (backend) and **Vercel** (frontend).
 
 ---
