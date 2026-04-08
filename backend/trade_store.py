@@ -65,6 +65,21 @@ class TradeStore:
         with self._lock:
             return list(reversed(self._trades))
 
+    def for_export(self, year: int | None = None) -> list[dict]:
+        """All trades oldest-first, optionally filtered to a calendar year."""
+        with self._lock:
+            trades = list(self._trades)          # oldest first
+        if year is not None:
+            prefix = str(year)
+            trades = [t for t in trades if t.get("timestamp", "").startswith(prefix)]
+        return trades
+
+    def available_years(self) -> list[int]:
+        """Distinct years present in the log, descending."""
+        with self._lock:
+            years = {int(t["timestamp"][:4]) for t in self._trades if t.get("timestamp")}
+        return sorted(years, reverse=True)
+
     def count(self) -> int:
         with self._lock:
             return len(self._trades)

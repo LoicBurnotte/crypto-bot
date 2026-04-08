@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import io
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -7,7 +9,7 @@ from typing import Any, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from config import cfg, PROFILES
@@ -237,6 +239,96 @@ async def get_portfolio():
     except Exception as e:
         logger.error("Portfolio fetch failed: %s", e)
         raise HTTPException(status_code=503, detail=str(e))
+
+
+_EXPORT_COLUMNS = [
+    ("timestamp",    "Timestamp"),
+    ("symbol",       "Symbol"),
+    ("side",         "Side"),
+    ("price",        "Price (€)"),
+    ("amount_eur",   "Amount (€)"),
+    ("amount_crypto","Amount (crypto)"),
+    ("pnl_eur",      "P&L (€)"),
+    ("reason",       "Reason"),
+    ("dry_run",      "Dry run"),
+    ("order_id",     "Order ID"),
+]
+
+
+@app.get("/trades/years")
+def trade_years():
+    return {"years": bot.trade_log.available_years()}
+
+
+@app.get("/trades/export")
+def export_trades(
+    year:   Optional[int] = Query(None, description="Filter to calendar year, e.g. 2025"),
+    format: str           = Query("csv", pattern="^(csv|xlsx)$"),
+):
+    trades   = bot.trade_log.for_export(year)
+    filename = f"trades{'_' + str(year) if year else '_all'}.{format}"
+
+    if format == "csv":
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([col for _, col in _EXPORT_COLUMNS])
+        for t in trades:
+            writer.writerow([t.get(key, "") for key, _ in _EXPORT_COLUMNS])
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"',
+                     "Access-Control-Allow-Origin": "*",
+                     "Access-Control-Expose-Headers": "Content-Disposition"},
+        )
+
+    # xlsx
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl not installed")
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Trades {year or 'All'}"
+
+    # Header row
+    header_fill = PatternFill("solid", fgColor="1E2235")
+    header_font = Font(bold=True, color="FFFFFF")
+    for col_idx, (_, col_label) in enumerate(_EXPORT_COLUMNS, 1):
+        cell = ws.cell(row=1, column=col_idx, value=col_label)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    # Data rows
+    for row_idx, t in enumerate(trades, 2):
+        for col_idx, (key, _) in enumerate(_EXPORT_COLUMNS, 1):
+            val = t.get(key, "")
+            if key == "dry_run":
+                val = "Yes" if val else "No"
+            ws.cell(row=row_idx, column=col_idx, value=val)
+
+    # Auto-fit column widths
+    for col in ws.columns:
+        max_len = max((len(str(cell.value or "")) for cell in col), default=8)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 40)
+
+    # Freeze header
+    ws.freeze_panes = "A2"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"',
+                 "Access-Control-Allow-Origin": "*",
+                 "Access-Control-Expose-Headers": "Content-Disposition"},
+    )
 
 
 @app.get("/trades")
