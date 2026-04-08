@@ -3,19 +3,30 @@
 import { useState, lazy, Suspense } from "react";
 import type { AssetStatus } from "@/lib/api";
 import { setHoldUntilOverbought, setSymbolDisabled } from "@/lib/api";
+import { scoreLabel } from "@/lib/opportunity";
 import TradeModal from "./TradeModal";
 import styles from "./CryptoCard.module.css";
 
 const PriceChart = lazy(() => import("./PriceChart"));
 
 const SYMBOL_META: Record<string, { icon: string; color: string }> = {
-  "BTC/EUR": { icon: "₿", color: "#f59e0b" },
-  "ETH/EUR": { icon: "Ξ", color: "#a855f7" },
-  "SOL/EUR": { icon: "◎", color: "#22c55e" },
-  "XRP/EUR": { icon: "✕", color: "#3b82f6" },
-  "ADA/EUR": { icon: "₳", color: "#06b6d4" },
-  "DOT/EUR": { icon: "●", color: "#ec4899" },
-  "LINK/EUR": { icon: "⬡", color: "#2563eb" },
+  "BTC/EUR":   { icon: "₿",  color: "#f59e0b" },
+  "ETH/EUR":   { icon: "Ξ",  color: "#a855f7" },
+  "SOL/EUR":   { icon: "◎",  color: "#22c55e" },
+  "XRP/EUR":   { icon: "✕",  color: "#3b82f6" },
+  "ADA/EUR":   { icon: "₳",  color: "#06b6d4" },
+  "DOT/EUR":   { icon: "●",  color: "#ec4899" },
+  "LINK/EUR":  { icon: "⬡",  color: "#2563eb" },
+  "AVAX/EUR":  { icon: "▲",  color: "#ef4444" },
+  "ATOM/EUR":  { icon: "⬤",  color: "#6366f1" },
+  "MATIC/EUR": { icon: "⬟",  color: "#8b5cf6" },
+  "LTC/EUR":   { icon: "Ł",  color: "#94a3b8" },
+  "BCH/EUR":   { icon: "Ƀ",  color: "#16a34a" },
+  "NEAR/EUR":  { icon: "Ⓝ",  color: "#0ea5e9" },
+  "UNI/EUR":   { icon: "⚗",  color: "#f472b6" },
+  "DOGE/EUR":  { icon: "Ð",  color: "#ca8a04" },
+  "ALGO/EUR":  { icon: "◈",  color: "#14b8a6" },
+  "FIL/EUR":   { icon: "⬡",  color: "#64748b" },
 };
 
 function ActionBadge({ action }: { action: AssetStatus["last_action"] }) {
@@ -65,9 +76,11 @@ function fmt(value: number | null, decimals = 2): string {
 export default function CryptoCard({
   asset,
   flash,
+  score = 0,
 }: {
   asset: AssetStatus;
   flash: "up" | "down" | null;
+  score?: number;
 }) {
   const [modal, setModal] = useState<"buy" | "sell" | null>(null);
   const [toast, setToast] = useState<{ msg: string; error: boolean } | null>(null);
@@ -115,6 +128,19 @@ export default function CryptoCard({
             </div>
           </div>
           <div className={styles.headerRight}>
+            {/* Opportunity score badge */}
+            {!asset.disabled && score > 0 && (() => {
+              const lbl = scoreLabel(score);
+              return (
+                <span
+                  className={styles.scoreBadge}
+                  style={{ color: lbl.color, borderColor: lbl.color + "55", background: lbl.color + "18" }}
+                  title={`Opportunity score: ${score}/100`}
+                >
+                  🎯{score}
+                </span>
+              );
+            })()}
             {!asset.disabled && <ActionBadge action={asset.last_action} />}
             {asset.disabled  && <span className={styles.disabledBadge}>Paused</span>}
             <button
